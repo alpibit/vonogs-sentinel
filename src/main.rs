@@ -48,12 +48,23 @@ fn scanner() {
         }
     }
 
-    let port_input = port_input.trim().parse::<u16>().unwrap();
+    let port_input_formatted = match port_input.trim().parse::<u16>() {
+        Ok(port) => port,
+        Err(_) => {
+            println!("Failed to read port");
+            menu_fallback();
+            return;
+        }
+    };
+
     let ip_input = ip_input.trim();
 
-    println!("Scanning Port {} on IP address {}", port_input, ip_input);
+    println!(
+        "Scanning Port {} on IP address {}",
+        port_input_formatted, ip_input
+    );
 
-    let argument = format!("{}:{}", ip_input, port_input);
+    let argument = format!("{}:{}", ip_input, port_input_formatted);
 
     let stream = TcpStream::connect(argument);
 
