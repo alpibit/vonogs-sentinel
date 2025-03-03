@@ -2,6 +2,8 @@ use std::io;
 use std::net::TcpStream;
 use std::process;
 use std::{thread, time::Duration};
+use std::net::SocketAddr;
+
 
 fn main() {
     print_menu_items();
@@ -64,11 +66,18 @@ fn scanner() {
         port_input_formatted, ip_input
     );
 
-    let argument = format!("{}:{}", ip_input, port_input_formatted);
+    let socket_addr = match format!("{}:{}", ip_input, port_input_formatted).parse::<SocketAddr>() {
+        Ok(addr) => addr,
+        Err(_) => {
+            println!("Invalid address format");
+            return;
+        }
+    };
 
-    let stream = TcpStream::connect(argument);
-
-    println!("Scanning Result: {:?}", stream);
+    match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
+        Ok(_) => println!("Port {} is OPEN", port_input_formatted),
+        Err(_) => println!("Port {} is CLOSED", port_input_formatted),
+    }
 }
 
 enum MenuItem {
