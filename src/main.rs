@@ -1,4 +1,5 @@
 use std::io;
+use std::io::{stdin, stdout, Read, Write};
 use std::net::TcpStream;
 use std::process;
 use std::{thread, time::Duration};
@@ -78,6 +79,8 @@ fn scanner() {
         Ok(_) => println!("Port {} is OPEN", port_input_formatted),
         Err(_) => println!("Port {} is CLOSED", port_input_formatted),
     }
+
+    press_enter();
 }
 
 enum MenuItem {
@@ -132,4 +135,15 @@ fn menu_fallback() {
 fn end_program() {
     println!("Vonogs is closing!");
     process::exit(0x0100);
+}
+
+fn press_enter() {
+    let mut stdout = stdout();
+    stdout.write(b"Press Enter to continue...").unwrap();
+    stdout.flush().unwrap();
+    stdin().read(&mut [0]).unwrap();
+
+    clear_screen();
+
+    menu_fallback();
 }
