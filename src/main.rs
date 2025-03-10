@@ -1,10 +1,9 @@
 use std::io;
 use std::io::{stdin, stdout, Read, Write};
+use std::net::SocketAddr;
 use std::net::TcpStream;
 use std::process;
 use std::{thread, time::Duration};
-use std::net::SocketAddr;
-
 
 fn main() {
     print_menu_items();
@@ -145,5 +144,5 @@ fn press_enter() {
 
     clear_screen();
 
-    menu_fallback();
+    print_menu_items();
 }
