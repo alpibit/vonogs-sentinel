@@ -25,19 +25,8 @@ fn main() {
 
 fn scanner() {
     clear_screen();
-    let mut port_input = String::new();
-    let mut ip_input = String::new();
 
-    println!("Please enter Port number");
-    port_input.clear();
-    match io::stdin().read_line(&mut port_input) {
-        Ok(_) => println!("Selected Port {}", port_input),
-        Err(_) => {
-            println!("Failed to read port");
-            menu_fallback();
-            return;
-        }
-    }
+    let mut ip_input = String::new();
 
     println!("Please enter IP address");
     ip_input.clear();
@@ -50,33 +39,150 @@ fn scanner() {
         }
     }
 
-    let port_input_formatted = match port_input.trim().parse::<u16>() {
-        Ok(port) => port,
+    let ip_input = ip_input.trim();
+
+    println!("Scan multiple ports? (y/n)");
+    let mut multi_choice = String::new();
+    match io::stdin().read_line(&mut multi_choice) {
+        Ok(_) => {}
         Err(_) => {
-            println!("Failed to read port");
+            println!("Failed to read choice");
             menu_fallback();
             return;
         }
-    };
+    }
 
-    let ip_input = ip_input.trim();
+    if multi_choice.trim().to_lowercase() == "y" {
+        let mut start_port_input = String::new();
+        let mut end_port_input = String::new();
 
-    println!(
-        "Scanning Port {} on IP address {}",
-        port_input_formatted, ip_input
-    );
+        println!("Please enter START port number");
+        start_port_input.clear();
+        match io::stdin().read_line(&mut start_port_input) {
+            Ok(_) => {}
+            Err(_) => {
+                println!("Failed to read start port");
+                menu_fallback();
+                return;
+            }
+        }
 
-    let socket_addr = match format!("{}:{}", ip_input, port_input_formatted).parse::<SocketAddr>() {
-        Ok(addr) => addr,
-        Err(_) => {
-            println!("Invalid address format");
+        println!("Please enter END port number");
+        end_port_input.clear();
+        match io::stdin().read_line(&mut end_port_input) {
+            Ok(_) => {}
+            Err(_) => {
+                println!("Failed to read end port");
+                menu_fallback();
+                return;
+            }
+        }
+
+        let start_port = match start_port_input.trim().parse::<u16>() {
+            Ok(port) => port,
+            Err(_) => {
+                println!("Invalid start port");
+                menu_fallback();
+                return;
+            }
+        };
+
+        let end_port = match end_port_input.trim().parse::<u16>() {
+            Ok(port) => port,
+            Err(_) => {
+                println!("Invalid end port");
+                menu_fallback();
+                return;
+            }
+        };
+
+        if start_port > end_port {
+            println!("Start port must be less than end port");
+            menu_fallback();
             return;
         }
-    };
 
-    match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
-        Ok(_) => println!("Port {} is OPEN", port_input_formatted),
-        Err(_) => println!("Port {} is CLOSED", port_input_formatted),
+        println!(
+            "\nScanning ports {}-{} on {}",
+            start_port, end_port, ip_input
+        );
+        println!("This might take a while...\n");
+
+        let mut open_ports = Vec::new();
+
+        for port in start_port..=end_port {
+            let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
+                Ok(addr) => addr,
+                Err(_) => {
+                    println!("Invalid address format for port {}", port);
+                    continue;
+                }
+            };
+
+            match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(1)) {
+                Ok(_) => {
+                    println!("Port {} is OPEN", port);
+                    open_ports.push(port);
+                }
+                Err(_) => {
+                    // Don't print closed ports to reduce noise
+                }
+            }
+        }
+
+        println!("\nScan complete!");
+        println!("Found {} open ports", open_ports.len());
+        if !open_ports.is_empty() {
+            print!("Open ports: ");
+            for (i, port) in open_ports.iter().enumerate() {
+                if i > 0 {
+                    print!(", ");
+                }
+                print!("{}", port);
+            }
+            println!();
+        }
+    } else {
+        let mut port_input = String::new();
+
+        println!("Please enter Port number");
+        port_input.clear();
+        match io::stdin().read_line(&mut port_input) {
+            Ok(_) => println!("Selected Port {}", port_input),
+            Err(_) => {
+                println!("Failed to read port");
+                menu_fallback();
+                return;
+            }
+        }
+
+        let port_input_formatted = match port_input.trim().parse::<u16>() {
+            Ok(port) => port,
+            Err(_) => {
+                println!("Failed to read port");
+                menu_fallback();
+                return;
+            }
+        };
+
+        println!(
+            "Scanning Port {} on IP address {}",
+            port_input_formatted, ip_input
+        );
+
+        let socket_addr =
+            match format!("{}:{}", ip_input, port_input_formatted).parse::<SocketAddr>() {
+                Ok(addr) => addr,
+                Err(_) => {
+                    println!("Invalid address format");
+                    return;
+                }
+            };
+
+        match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
+            Ok(_) => println!("Port {} is OPEN", port_input_formatted),
+            Err(_) => println!("Port {} is CLOSED", port_input_formatted),
+        }
     }
 
     press_enter();
