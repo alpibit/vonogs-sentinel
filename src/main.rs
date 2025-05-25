@@ -15,7 +15,9 @@ fn main() {
         match io::stdin().read_line(&mut input_string) {
             Ok(_) => match input_string.as_str().trim() {
                 "1" => scanner(),
-                "2" => end_program(),
+                "2" => quick_scan(),
+                "3" => common_ports_scan(),
+                "4" => end_program(),
                 _ => menu_fallback(),
             },
             Err(_) => menu_fallback(),
@@ -188,16 +190,149 @@ fn scanner() {
     press_enter();
 }
 
+fn quick_scan() {
+    clear_screen();
+    println!("=== Quick Scan (Top 20 ports) ===\n");
+
+    let mut ip_input = String::new();
+    println!("Please enter IP address");
+    match io::stdin().read_line(&mut ip_input) {
+        Ok(_) => {}
+        Err(_) => {
+            println!("Failed to read IP address");
+            menu_fallback();
+            return;
+        }
+    }
+
+    let ip_input = ip_input.trim();
+
+    let quick_ports = [
+        21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 445, 993, 995, 1723, 3306, 3389,
+        5900, 8080,
+    ];
+
+    println!("Scanning top {} ports on {}\n", quick_ports.len(), ip_input);
+
+    let mut open_ports = Vec::new();
+
+    for port in quick_ports.iter() {
+        let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
+            Ok(addr) => addr,
+            Err(_) => continue,
+        };
+
+        match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
+            Ok(_) => {
+                println!("Port {} is OPEN", port);
+                open_ports.push(*port);
+            }
+            Err(_) => {
+                // Don't print closed ports to reduce noise
+            }
+        }
+    }
+
+    println!("\nQuick scan complete!");
+    println!(
+        "Found {} open ports out of {} scanned",
+        open_ports.len(),
+        quick_ports.len()
+    );
+
+    press_enter();
+}
+
+fn common_ports_scan() {
+    clear_screen();
+    println!("=== Common Services Scan ===\n");
+
+    let mut ip_input = String::new();
+    println!("Please enter IP address");
+    match io::stdin().read_line(&mut ip_input) {
+        Ok(_) => {}
+        Err(_) => {
+            println!("Failed to read IP address");
+            menu_fallback();
+            return;
+        }
+    }
+
+    let ip_input = ip_input.trim();
+
+    let services = [
+        (21, "FTP"),
+        (22, "SSH"),
+        (23, "Telnet"),
+        (25, "SMTP"),
+        (53, "DNS"),
+        (80, "HTTP"),
+        (110, "POP3"),
+        (143, "IMAP"),
+        (443, "HTTPS"),
+        (445, "SMB"),
+        (3306, "MySQL"),
+        (3389, "RDP"),
+        (5432, "PostgreSQL"),
+        (5900, "VNC"),
+        (8080, "HTTP-Alt"),
+    ];
+
+    println!(
+        "Scanning {} common service ports on {}\n",
+        services.len(),
+        ip_input
+    );
+
+    let mut found_services = Vec::new();
+
+    for (port, service) in services.iter() {
+        let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
+            Ok(addr) => addr,
+            Err(_) => continue,
+        };
+
+        print!("Checking {} ({})... ", service, port);
+        io::stdout().flush().unwrap();
+
+        match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
+            Ok(_) => {
+                println!("OPEN");
+                found_services.push((*port, *service));
+            }
+            Err(_) => {
+                println!("closed");
+            }
+        }
+    }
+
+    println!("\nScan complete!");
+    if !found_services.is_empty() {
+        println!("\nDiscovered services:");
+        for (port, service) in found_services.iter() {
+            println!("  {} ({})", service, port);
+        }
+    } else {
+        println!("No common services found.");
+    }
+
+    press_enter();
+}
+
 enum MenuItem {
-    SinglePortScan,
+    CustomScan,
+    QuickScan,
+    CommonPorts,
     Exit,
 }
 
 impl MenuItem {
     fn get_description(&self) -> String {
         match self {
-            MenuItem::SinglePortScan => String::from("1. Single Port Scan"),
-            MenuItem::Exit => String::from("2. Exit"),
+            MenuItem::CustomScan => String::from("1. Custom Port Scan"),
+            MenuItem::QuickScan => String::from("2. Quick Scan (Top 20)"),
+            MenuItem::CommonPorts => String::from("3. Common Services"),
+            MenuItem::Exit => String::from("4. Exit"),
         }
     }
 }
@@ -212,16 +347,25 @@ fn print_menu_items() {
 
     let my_scanner: ScannerBasicInfo = ScannerBasicInfo {
         name: String::from("Vonogs Scanner"),
-        version: 0.1,
+        version: 0.2,
     };
-    println!("{} Scanner: v{}", my_scanner.name, my_scanner.version);
-    println!("------------------");
+    println!("{} v{}", my_scanner.name, my_scanner.version);
+    println!("====================");
 
-    let menu: [MenuItem; 2] = [MenuItem::SinglePortScan, MenuItem::Exit];
+    let menu: [MenuItem; 4] = [
+        MenuItem::CustomScan,
+        MenuItem::QuickScan,
+        MenuItem::CommonPorts,
+        MenuItem::Exit,
+    ];
 
     for item in &menu {
         println!("{}", item.get_description());
     }
+
+    println!("====================");
+    print!("Select an option: ");
+    io::stdout().flush().unwrap();
 }
 
 fn clear_screen() {
