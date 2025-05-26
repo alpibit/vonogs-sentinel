@@ -187,7 +187,7 @@ fn scanner() {
         }
     }
 
-    press_enter();
+    press_enter_to_continue();
 }
 
 fn quick_scan() {
@@ -240,7 +240,11 @@ fn quick_scan() {
         quick_ports.len()
     );
 
-    press_enter();
+    if open_ports.is_empty() {
+        press_enter_with_message("No open ports found. Press Enter to return to menu...");
+    } else {
+        press_enter_with_message("Scan successful! Press Enter to return to menu...");
+    }
 }
 
 fn common_ports_scan() {
@@ -312,11 +316,11 @@ fn common_ports_scan() {
         for (port, service) in found_services.iter() {
             println!("  {} ({})", service, port);
         }
+        press_enter_with_message("\nServices found! Press Enter to save results and continue...");
     } else {
         println!("No common services found.");
+        press_enter_to_continue();
     }
-
-    press_enter();
 }
 
 enum MenuItem {
@@ -382,17 +386,26 @@ fn menu_fallback() {
 }
 
 fn end_program() {
-    println!("Vonogs is closing!");
-    process::exit(0x0100);
+    println!("\nThank you for using Vonogs Scanner!");
+    println!("Goodbye!");
+    thread::sleep(Duration::from_millis(1000));
+    process::exit(0);
 }
 
 fn press_enter() {
+    press_enter_with_message("Press Enter to continue...");
+}
+
+fn press_enter_with_message(message: &str) {
     let mut stdout = stdout();
-    stdout.write(b"Press Enter to continue...").unwrap();
+    write!(stdout, "\n{}", message).unwrap();
     stdout.flush().unwrap();
     stdin().read(&mut [0]).unwrap();
 
     clear_screen();
-
     print_menu_items();
+}
+
+fn press_enter_to_continue() {
+    press_enter_with_message("Press Enter to continue...");
 }
