@@ -111,26 +111,50 @@ fn scanner() {
         println!("This might take a while...\n");
 
         let mut open_ports = Vec::new();
+        let total_ports = end_port - start_port + 1;
+        let mut scanned_count = 0;
 
         for port in start_port..=end_port {
+            scanned_count += 1;
+
+            let percentage = (scanned_count as f32 / total_ports as f32 * 100.0) as u32;
+            print!(
+                "\rScanning port {} [{}/{}] {}% ",
+                port, scanned_count, total_ports, percentage
+            );
+            print_progress_bar(percentage);
+            io::stdout().flush().unwrap();
+
             let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
                 Ok(addr) => addr,
                 Err(_) => {
-                    println!("Invalid address format for port {}", port);
                     continue;
                 }
             };
 
             match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(1)) {
                 Ok(_) => {
-                    println!("Port {} is OPEN", port);
+                    print!("\r");
+                    print!("{}", " ".repeat(60));
+                    print!("\rPort {} is OPEN\n", port);
                     open_ports.push(port);
+
+                    print!(
+                        "Scanning port {} [{}/{}] {}% ",
+                        port, scanned_count, total_ports, percentage
+                    );
+                    print_progress_bar(percentage);
+                    io::stdout().flush().unwrap();
                 }
                 Err(_) => {
                     // Don't print closed ports to reduce noise
                 }
             }
         }
+
+        print!("\r");
+        print!("{}", " ".repeat(60));
+        print!("\r");
 
         println!("\nScan complete!");
         println!("Found {} open ports", open_ports.len());
@@ -172,18 +196,25 @@ fn scanner() {
             port_input_formatted, ip_input
         );
 
+        print!("Scanning... ");
+        for _ in 0..3 {
+            print!(".");
+            io::stdout().flush().unwrap();
+            thread::sleep(Duration::from_millis(300));
+        }
+
         let socket_addr =
             match format!("{}:{}", ip_input, port_input_formatted).parse::<SocketAddr>() {
                 Ok(addr) => addr,
                 Err(_) => {
-                    println!("Invalid address format");
+                    println!("\nInvalid address format");
                     return;
                 }
             };
 
         match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
-            Ok(_) => println!("Port {} is OPEN", port_input_formatted),
-            Err(_) => println!("Port {} is CLOSED", port_input_formatted),
+            Ok(_) => println!(" OPEN"),
+            Err(_) => println!(" CLOSED"),
         }
     }
 
@@ -215,8 +246,19 @@ fn quick_scan() {
     println!("Scanning top {} ports on {}\n", quick_ports.len(), ip_input);
 
     let mut open_ports = Vec::new();
+    let total_ports = quick_ports.len();
 
-    for port in quick_ports.iter() {
+    for (index, port) in quick_ports.iter().enumerate() {
+        let percentage = ((index + 1) as f32 / total_ports as f32 * 100.0) as u32;
+        print!(
+            "\rProgress: [{}/{}] {}% ",
+            index + 1,
+            total_ports,
+            percentage
+        );
+        print_progress_bar(percentage);
+        io::stdout().flush().unwrap();
+
         let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
             Ok(addr) => addr,
             Err(_) => continue,
@@ -224,7 +266,6 @@ fn quick_scan() {
 
         match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
             Ok(_) => {
-                println!("Port {} is OPEN", port);
                 open_ports.push(*port);
             }
             Err(_) => {
@@ -233,12 +274,27 @@ fn quick_scan() {
         }
     }
 
-    println!("\nQuick scan complete!");
+    print!("\r");
+    print!("{}", " ".repeat(60));
+    print!("\r");
+
+    println!("Quick scan complete!");
     println!(
         "Found {} open ports out of {} scanned",
         open_ports.len(),
         quick_ports.len()
     );
+
+    if !open_ports.is_empty() {
+        print!("Open ports: ");
+        for (i, port) in open_ports.iter().enumerate() {
+            if i > 0 {
+                print!(", ");
+            }
+            print!("{}", port);
+        }
+        println!();
+    }
 
     if open_ports.is_empty() {
         press_enter_with_message("No open ports found. Press Enter to return to menu...");
@@ -301,7 +357,7 @@ fn common_ports_scan() {
 
         match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
             Ok(_) => {
-                println!("OPEN");
+                println!("OPEN ✓");
                 found_services.push((*port, *service));
             }
             Err(_) => {
@@ -321,6 +377,22 @@ fn common_ports_scan() {
         println!("No common services found.");
         press_enter_to_continue();
     }
+}
+
+fn print_progress_bar(percentage: u32) {
+    let bar_width: usize = 20;
+    let filled = (bar_width * percentage as usize / 100);
+    let empty = bar_width.saturating_sub(filled);
+
+    print!("[");
+    print!("{}", "=".repeat(filled));
+    if filled < bar_width {
+        print!(">");
+        if empty > 1 {
+            print!("{}", " ".repeat(empty - 1));
+        }
+    }
+    print!("]");
 }
 
 enum MenuItem {
