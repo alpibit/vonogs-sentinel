@@ -15,13 +15,120 @@ fn main() {
         match io::stdin().read_line(&mut input_string) {
             Ok(_) => match input_string.as_str().trim() {
                 "1" => scanner(),
-                "2" => quick_scan(),
-                "3" => common_ports_scan(),
-                "4" => end_program(),
+                "2" => profile_scan(),
+                "3" => end_program(),
                 _ => menu_fallback(),
             },
             Err(_) => menu_fallback(),
         }
+    }
+}
+
+fn get_service_name(port: u16) -> &'static str {
+    match port {
+        20 => "FTP-DATA",
+        21 => "FTP",
+        22 => "SSH",
+        23 => "Telnet",
+        25 => "SMTP",
+        53 => "DNS",
+        67 => "DHCP",
+        68 => "DHCP",
+        69 => "TFTP",
+        80 => "HTTP",
+        110 => "POP3",
+        111 => "RPC",
+        113 => "Ident",
+        119 => "NNTP",
+        123 => "NTP",
+        135 => "RPC",
+        137 => "NetBIOS",
+        138 => "NetBIOS",
+        139 => "NetBIOS",
+        143 => "IMAP",
+        161 => "SNMP",
+        162 => "SNMP",
+        179 => "BGP",
+        194 => "IRC",
+        389 => "LDAP",
+        443 => "HTTPS",
+        445 => "SMB",
+        465 => "SMTPS",
+        514 => "Syslog",
+        515 => "LPD",
+        587 => "SMTP",
+        631 => "IPP",
+        636 => "LDAPS",
+        873 => "Rsync",
+        902 => "VMware",
+        989 => "FTPS",
+        990 => "FTPS",
+        993 => "IMAPS",
+        995 => "POP3S",
+        1080 => "SOCKS",
+        1194 => "OpenVPN",
+        1433 => "MSSQL",
+        1434 => "MSSQL",
+        1521 => "Oracle",
+        1723 => "PPTP",
+        2049 => "NFS",
+        2082 => "cPanel",
+        2083 => "cPanel",
+        2086 => "WHM",
+        2087 => "WHM",
+        2121 => "FTP",
+        2222 => "SSH",
+        3128 => "Proxy",
+        3306 => "MySQL",
+        3389 => "RDP",
+        3690 => "SVN",
+        4443 => "HTTPS",
+        4444 => "Metasploit",
+        5060 => "SIP",
+        5061 => "SIP-TLS",
+        5432 => "PostgreSQL",
+        5900 => "VNC",
+        5901 => "VNC",
+        5984 => "CouchDB",
+        5985 => "WinRM",
+        6379 => "Redis",
+        6666 => "IRC",
+        6667 => "IRC",
+        7000 => "Cassandra",
+        7001 => "Cassandra",
+        8000 => "HTTP",
+        8008 => "HTTP",
+        8020 => "HTTP",
+        8080 => "HTTP-Proxy",
+        8081 => "HTTP",
+        8086 => "InfluxDB",
+        8087 => "HTTP",
+        8088 => "HTTP",
+        8090 => "HTTP",
+        8091 => "HTTP",
+        8222 => "NATS",
+        8443 => "HTTPS",
+        8500 => "Consul",
+        8888 => "HTTP",
+        9000 => "HTTP",
+        9001 => "Tor",
+        9090 => "HTTP",
+        9092 => "Kafka",
+        9100 => "Printer",
+        9200 => "Elasticsearch",
+        9300 => "Elasticsearch",
+        9418 => "Git",
+        10000 => "Webmin",
+        10050 => "Zabbix",
+        10051 => "Zabbix",
+        11211 => "Memcached",
+        15672 => "RabbitMQ",
+        22222 => "SSH",
+        27017 => "MongoDB",
+        28017 => "MongoDB",
+        50000 => "HTTP",
+        50070 => "HDFS",
+        _ => "Unknown",
     }
 }
 
@@ -136,7 +243,8 @@ fn scanner() {
                 Ok(_) => {
                     print!("\r");
                     print!("{}", " ".repeat(60));
-                    print!("\rPort {} is OPEN\n", port);
+                    let service_name = get_service_name(port);
+                    print!("\rPort {} ({}) is OPEN\n", port, service_name);
                     open_ports.push(port);
 
                     print!(
@@ -159,14 +267,11 @@ fn scanner() {
         println!("\nScan complete!");
         println!("Found {} open ports", open_ports.len());
         if !open_ports.is_empty() {
-            print!("Open ports: ");
-            for (i, port) in open_ports.iter().enumerate() {
-                if i > 0 {
-                    print!(", ");
-                }
-                print!("{}", port);
+            println!("\nOpen ports:");
+            for port in open_ports.iter() {
+                let service_name = get_service_name(*port);
+                println!("  Port {:<6} {:<15} OPEN", port, service_name);
             }
-            println!();
         }
     } else {
         let mut port_input = String::new();
@@ -213,7 +318,10 @@ fn scanner() {
             };
 
         match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
-            Ok(_) => println!(" OPEN"),
+            Ok(_) => {
+                let service_name = get_service_name(port_input_formatted);
+                println!(" OPEN ({})", service_name);
+            }
             Err(_) => println!(" CLOSED"),
         }
     }
@@ -221,94 +329,47 @@ fn scanner() {
     press_enter_to_continue();
 }
 
-fn quick_scan() {
-    clear_screen();
-    println!("=== Quick Scan (Top 20 ports) ===\n");
+#[derive(Debug)]
+enum ScanProfile {
+    Quick,
+    Web,
+    Database,
+    Full,
+}
 
-    let mut ip_input = String::new();
-    println!("Please enter IP address");
-    match io::stdin().read_line(&mut ip_input) {
-        Ok(_) => {}
-        Err(_) => {
-            println!("Failed to read IP address");
-            menu_fallback();
-            return;
+impl ScanProfile {
+    fn get_ports(&self) -> Vec<u16> {
+        match self {
+            ScanProfile::Quick => vec![
+                21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 993, 995, 1723, 3306, 3389, 5900, 8080,
+            ],
+            ScanProfile::Web => vec![80, 443, 8080, 8443, 8000, 8008, 8088, 3128, 8888, 9000],
+            ScanProfile::Database => {
+                vec![3306, 5432, 1433, 1521, 27017, 6379, 9200, 5984, 7000, 8086]
+            }
+            ScanProfile::Full => vec![
+                21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 445, 993, 995, 1433, 1521,
+                1723, 3306, 3389, 5432, 5900, 5984, 6379, 7000, 8080, 8086, 8443, 9200, 27017,
+            ],
         }
     }
 
-    let ip_input = ip_input.trim();
-
-    let quick_ports = [
-        21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 445, 993, 995, 1723, 3306, 3389,
-        5900, 8080,
-    ];
-
-    println!("Scanning top {} ports on {}\n", quick_ports.len(), ip_input);
-
-    let mut open_ports = Vec::new();
-    let total_ports = quick_ports.len();
-
-    for (index, port) in quick_ports.iter().enumerate() {
-        let percentage = ((index + 1) as f32 / total_ports as f32 * 100.0) as u32;
-        print!(
-            "\rProgress: [{}/{}] {}% ",
-            index + 1,
-            total_ports,
-            percentage
-        );
-        print_progress_bar(percentage);
-        io::stdout().flush().unwrap();
-
-        let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
-            Ok(addr) => addr,
-            Err(_) => continue,
-        };
-
-        match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
-            Ok(_) => {
-                open_ports.push(*port);
-            }
-            Err(_) => {
-                // Don't print closed ports to reduce noise
-            }
+    fn get_name(&self) -> &str {
+        match self {
+            ScanProfile::Quick => "Quick Scan",
+            ScanProfile::Web => "Web Services",
+            ScanProfile::Database => "Database Services",
+            ScanProfile::Full => "Full Common Ports",
         }
-    }
-
-    print!("\r");
-    print!("{}", " ".repeat(60));
-    print!("\r");
-
-    println!("Quick scan complete!");
-    println!(
-        "Found {} open ports out of {} scanned",
-        open_ports.len(),
-        quick_ports.len()
-    );
-
-    if !open_ports.is_empty() {
-        print!("Open ports: ");
-        for (i, port) in open_ports.iter().enumerate() {
-            if i > 0 {
-                print!(", ");
-            }
-            print!("{}", port);
-        }
-        println!();
-    }
-
-    if open_ports.is_empty() {
-        press_enter_with_message("No open ports found. Press Enter to return to menu...");
-    } else {
-        press_enter_with_message("Scan successful! Press Enter to return to menu...");
     }
 }
 
-fn common_ports_scan() {
+fn profile_scan() {
     clear_screen();
-    println!("=== Common Services Scan ===\n");
+    println!("=== Profile-Based Port Scanner ===\n");
 
     let mut ip_input = String::new();
-    println!("Please enter IP address");
+    println!("Please enter IP address:");
     match io::stdin().read_line(&mut ip_input) {
         Ok(_) => {}
         Err(_) => {
@@ -317,66 +378,106 @@ fn common_ports_scan() {
             return;
         }
     }
-
     let ip_input = ip_input.trim();
 
-    let services = [
-        (21, "FTP"),
-        (22, "SSH"),
-        (23, "Telnet"),
-        (25, "SMTP"),
-        (53, "DNS"),
-        (80, "HTTP"),
-        (110, "POP3"),
-        (143, "IMAP"),
-        (443, "HTTPS"),
-        (445, "SMB"),
-        (3306, "MySQL"),
-        (3389, "RDP"),
-        (5432, "PostgreSQL"),
-        (5900, "VNC"),
-        (8080, "HTTP-Alt"),
-    ];
+    println!("\nSelect scan profile:");
+    println!("1. Quick Scan (17 ports)");
+    println!("2. Web Services (10 ports)");
+    println!("3. Database Services (10 ports)");
+    println!("4. Full Scan (30 ports)");
+    print!("\nYour choice: ");
+    io::stdout().flush().unwrap();
+
+    let mut profile_choice = String::new();
+    match io::stdin().read_line(&mut profile_choice) {
+        Ok(_) => {}
+        Err(_) => {
+            println!("Failed to read choice");
+            menu_fallback();
+            return;
+        }
+    }
+
+    let profile = match profile_choice.trim() {
+        "1" => ScanProfile::Quick,
+        "2" => ScanProfile::Web,
+        "3" => ScanProfile::Database,
+        "4" => ScanProfile::Full,
+        _ => {
+            println!("Invalid choice");
+            menu_fallback();
+            return;
+        }
+    };
+
+    let ports_to_scan = profile.get_ports();
+    let total_ports = ports_to_scan.len();
 
     println!(
-        "Scanning {} common service ports on {}\n",
-        services.len(),
+        "\n{} - Scanning {} ports on {}\n",
+        profile.get_name(),
+        total_ports,
         ip_input
     );
 
-    let mut found_services = Vec::new();
+    let mut open_ports = Vec::new();
 
-    for (port, service) in services.iter() {
+    for (index, port) in ports_to_scan.iter().enumerate() {
+        let percentage = ((index + 1) as f32 / total_ports as f32 * 100.0) as u32;
+        let service_name = get_service_name(*port);
+
+        print!("\rScanning {} ({})... ", service_name, port);
+        io::stdout().flush().unwrap();
+
         let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
             Ok(addr) => addr,
             Err(_) => continue,
         };
 
-        print!("Checking {} ({})... ", service, port);
-        io::stdout().flush().unwrap();
-
         match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
             Ok(_) => {
-                println!("OPEN ✓");
-                found_services.push((*port, *service));
+                print!("\r\x1b[2K");
+                println!("✓ {} ({}) - OPEN", service_name, port);
+                open_ports.push(*port);
+
+                print!("Progress: [{}/{}] {}% ", index + 1, total_ports, percentage);
+                print_progress_bar(percentage);
+                io::stdout().flush().unwrap();
             }
             Err(_) => {
-                println!("closed");
+                print!(
+                    "\rProgress: [{}/{}] {}% ",
+                    index + 1,
+                    total_ports,
+                    percentage
+                );
+                print_progress_bar(percentage);
+                io::stdout().flush().unwrap();
             }
         }
     }
 
-    println!("\nScan complete!");
-    if !found_services.is_empty() {
-        println!("\nDiscovered services:");
-        for (port, service) in found_services.iter() {
-            println!("  {} ({})", service, port);
+    print!("\r\x1b[2K");
+
+    println!("\n{} Scan Complete!", profile.get_name());
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!(
+        "Found {} open ports out of {} scanned",
+        open_ports.len(),
+        total_ports
+    );
+
+    if !open_ports.is_empty() {
+        println!("\nSummary of open services:");
+        for port in &open_ports {
+            let service = get_service_name(*port);
+            println!("  • {:<15} on port {}", service, port);
         }
-        press_enter_with_message("\nServices found! Press Enter to save results and continue...");
     } else {
-        println!("No common services found.");
-        press_enter_to_continue();
+        println!("\nNo open ports found.");
     }
+
+    press_enter_to_continue();
 }
 
 fn print_progress_bar(percentage: u32) {
@@ -397,8 +498,7 @@ fn print_progress_bar(percentage: u32) {
 
 enum MenuItem {
     CustomScan,
-    QuickScan,
-    CommonPorts,
+    ProfileScan,
     Exit,
 }
 
@@ -406,9 +506,8 @@ impl MenuItem {
     fn get_description(&self) -> String {
         match self {
             MenuItem::CustomScan => String::from("1. Custom Port Scan"),
-            MenuItem::QuickScan => String::from("2. Quick Scan (Top 20)"),
-            MenuItem::CommonPorts => String::from("3. Common Services"),
-            MenuItem::Exit => String::from("4. Exit"),
+            MenuItem::ProfileScan => String::from("2. Profile Scan"),
+            MenuItem::Exit => String::from("3. Exit"),
         }
     }
 }
@@ -423,17 +522,12 @@ fn print_menu_items() {
 
     let my_scanner: ScannerBasicInfo = ScannerBasicInfo {
         name: String::from("Vonogs Scanner"),
-        version: 0.2,
+        version: 0.3,
     };
     println!("{} v{}", my_scanner.name, my_scanner.version);
     println!("====================");
 
-    let menu: [MenuItem; 4] = [
-        MenuItem::CustomScan,
-        MenuItem::QuickScan,
-        MenuItem::CommonPorts,
-        MenuItem::Exit,
-    ];
+    let menu: [MenuItem; 3] = [MenuItem::CustomScan, MenuItem::ProfileScan, MenuItem::Exit];
 
     for item in &menu {
         println!("{}", item.get_description());
@@ -462,10 +556,6 @@ fn end_program() {
     println!("Goodbye!");
     thread::sleep(Duration::from_millis(1000));
     process::exit(0);
-}
-
-fn press_enter() {
-    press_enter_with_message("Press Enter to continue...");
 }
 
 fn press_enter_with_message(message: &str) {
