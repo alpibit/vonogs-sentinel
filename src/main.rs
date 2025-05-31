@@ -539,8 +539,12 @@ fn print_menu_items() {
 }
 
 fn clear_screen() {
-    if let Err(_) = std::process::Command::new("clear").status() {
-        println!("\n\n\n\n");
+    if cfg!(target_os = "windows") {
+        let _ = std::process::Command::new("cmd")
+            .args(["/c", "cls"])
+            .status();
+    } else {
+        let _ = std::process::Command::new("clear").status();
     }
 }
 
