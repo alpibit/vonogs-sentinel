@@ -8,6 +8,13 @@ use std::net::TcpStream;
 use std::process;
 use std::{thread, time::Duration};
 
+const RESET: &str = "\x1b[0m";
+const RED: &str = "\x1b[31m";
+const GREEN: &str = "\x1b[32m";
+const YELLOW: &str = "\x1b[33m";
+const CYAN: &str = "\x1b[36m";
+const BOLD: &str = "\x1b[1m";
+
 fn main() {
     print_menu_items();
 
@@ -35,9 +42,9 @@ fn scanner() {
     println!("Please enter IP address");
     ip_input.clear();
     match io::stdin().read_line(&mut ip_input) {
-        Ok(_) => println!("Selected IP address {}", ip_input),
+        Ok(_) => println!("Selected IP address {}{}{}", CYAN, ip_input.trim(), RESET),
         Err(_) => {
-            println!("Failed to read IP address");
+            println!("{}Failed to read IP address{}", RED, RESET);
             menu_fallback();
             return;
         }
@@ -50,7 +57,7 @@ fn scanner() {
     match io::stdin().read_line(&mut multi_choice) {
         Ok(_) => {}
         Err(_) => {
-            println!("Failed to read choice");
+            println!("{}Failed to read choice{}", RED, RESET);
             menu_fallback();
             return;
         }
@@ -65,7 +72,7 @@ fn scanner() {
         match io::stdin().read_line(&mut start_port_input) {
             Ok(_) => {}
             Err(_) => {
-                println!("Failed to read start port");
+                println!("{}Failed to read start port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
@@ -76,7 +83,7 @@ fn scanner() {
         match io::stdin().read_line(&mut end_port_input) {
             Ok(_) => {}
             Err(_) => {
-                println!("Failed to read end port");
+                println!("{}Failed to read end port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
@@ -85,7 +92,7 @@ fn scanner() {
         let start_port = match start_port_input.trim().parse::<u16>() {
             Ok(port) => port,
             Err(_) => {
-                println!("Invalid start port");
+                println!("{}Invalid start port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
@@ -94,21 +101,21 @@ fn scanner() {
         let end_port = match end_port_input.trim().parse::<u16>() {
             Ok(port) => port,
             Err(_) => {
-                println!("Invalid end port");
+                println!("{}Invalid end port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
         };
 
         if start_port > end_port {
-            println!("Start port must be less than end port");
+            println!("{}Start port must be less than end port{}", RED, RESET);
             menu_fallback();
             return;
         }
 
         println!(
-            "\nScanning ports {}-{} on {}",
-            start_port, end_port, ip_input
+            "\nScanning ports {}{}-{}{} on {}{}{}",
+            YELLOW, start_port, end_port, RESET, CYAN, ip_input, RESET
         );
         println!("This might take a while...\n");
 
@@ -139,7 +146,10 @@ fn scanner() {
                     print!("\r");
                     print!("{}", " ".repeat(60));
                     let service_name = get_service_name(port);
-                    print!("\rPort {} ({}) is OPEN\n", port, service_name);
+                    print!(
+                        "\rPort {}{}{} ({}{}{}) is {}{}OPEN{}\n",
+                        YELLOW, port, RESET, CYAN, service_name, RESET, GREEN, BOLD, RESET
+                    );
                     open_ports.push(port);
 
                     print!(
@@ -159,13 +169,16 @@ fn scanner() {
         print!("{}", " ".repeat(60));
         print!("\r");
 
-        println!("\nScan complete!");
-        println!("Found {} open ports", open_ports.len());
+        println!("\n{}{}Scan complete!{}", GREEN, BOLD, RESET);
+        println!("Found {}{}{} open ports", GREEN, open_ports.len(), RESET);
         if !open_ports.is_empty() {
-            println!("\nOpen ports:");
+            println!("\n{}Open ports{}:", YELLOW, RESET);
             for port in open_ports.iter() {
                 let service_name = get_service_name(*port);
-                println!("  Port {:<6} {:<15} OPEN", port, service_name);
+                println!(
+                    "  Port {}{:<6}{} {}{:<15}{} {}OPEN{}",
+                    YELLOW, port, RESET, CYAN, service_name, RESET, GREEN, RESET
+                );
             }
         }
     } else {
@@ -174,9 +187,9 @@ fn scanner() {
         println!("Please enter Port number");
         port_input.clear();
         match io::stdin().read_line(&mut port_input) {
-            Ok(_) => println!("Selected Port {}", port_input),
+            Ok(_) => println!("Selected Port {}{}{}", CYAN, port_input.trim(), RESET),
             Err(_) => {
-                println!("Failed to read port");
+                println!("{}Failed to read port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
@@ -185,15 +198,15 @@ fn scanner() {
         let port_input_formatted = match port_input.trim().parse::<u16>() {
             Ok(port) => port,
             Err(_) => {
-                println!("Failed to read port");
+                println!("{}Failed to read port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
         };
 
         println!(
-            "Scanning Port {} on IP address {}",
-            port_input_formatted, ip_input
+            "Scanning Port {}{}{} on IP address {}{}{}",
+            YELLOW, port_input_formatted, RESET, CYAN, ip_input, RESET
         );
 
         print!("Scanning... ");
@@ -207,7 +220,7 @@ fn scanner() {
             match format!("{}:{}", ip_input, port_input_formatted).parse::<SocketAddr>() {
                 Ok(addr) => addr,
                 Err(_) => {
-                    println!("\nInvalid address format");
+                    println!("\n{}Invalid address format{}", RED, RESET);
                     return;
                 }
             };
@@ -215,9 +228,12 @@ fn scanner() {
         match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
             Ok(_) => {
                 let service_name = get_service_name(port_input_formatted);
-                println!(" OPEN ({})", service_name);
+                println!(
+                    " {}{}OPEN{} ({}{}{})",
+                    GREEN, BOLD, RESET, CYAN, service_name, RESET
+                );
             }
-            Err(_) => println!(" CLOSED"),
+            Err(_) => println!(" {}CLOSED{}", RED, RESET),
         }
     }
 
@@ -261,21 +277,24 @@ impl ScanProfile {
 
 fn profile_scan() {
     clear_screen();
-    println!("=== Profile-Based Port Scanner ===\n");
+    println!(
+        "{}{}=== Profile-Based Port Scanner ==={}\n",
+        YELLOW, BOLD, RESET
+    );
 
     let mut ip_input = String::new();
     println!("Please enter IP address:");
     match io::stdin().read_line(&mut ip_input) {
         Ok(_) => {}
         Err(_) => {
-            println!("Failed to read IP address");
+            println!("{}Failed to read IP address{}", RED, RESET);
             menu_fallback();
             return;
         }
     }
     let ip_input = ip_input.trim();
 
-    println!("\nSelect scan profile:");
+    println!("\n{}Select scan profile{}:", YELLOW, RESET);
     println!("1. Quick Scan (17 ports)");
     println!("2. Web Services (10 ports)");
     println!("3. Database Services (10 ports)");
@@ -287,7 +306,7 @@ fn profile_scan() {
     match io::stdin().read_line(&mut profile_choice) {
         Ok(_) => {}
         Err(_) => {
-            println!("Failed to read choice");
+            println!("{}Failed to read choice{}", RED, RESET);
             menu_fallback();
             return;
         }
@@ -299,7 +318,7 @@ fn profile_scan() {
         "3" => ScanProfile::Database,
         "4" => ScanProfile::Full,
         _ => {
-            println!("Invalid choice");
+            println!("{}Invalid choice{}", RED, RESET);
             menu_fallback();
             return;
         }
@@ -309,10 +328,16 @@ fn profile_scan() {
     let total_ports = ports_to_scan.len();
 
     println!(
-        "\n{} - Scanning {} ports on {}\n",
+        "\n{}{}{} - Scanning {}{}{} ports on {}{}{}",
+        YELLOW,
         profile.get_name(),
+        RESET,
+        CYAN,
         total_ports,
-        ip_input
+        RESET,
+        CYAN,
+        ip_input,
+        RESET
     );
 
     let mut open_ports = Vec::new();
@@ -332,7 +357,20 @@ fn profile_scan() {
         match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
             Ok(_) => {
                 print!("\r\x1b[2K");
-                println!("✓ {} ({}) - OPEN", service_name, port);
+                println!(
+                    "{}✓{} {}{}{} ({}{}{}) - {}{}OPEN{}",
+                    GREEN,
+                    RESET,
+                    CYAN,
+                    service_name,
+                    RESET,
+                    YELLOW,
+                    port,
+                    RESET,
+                    GREEN,
+                    BOLD,
+                    RESET
+                );
                 open_ports.push(*port);
 
                 print!("Progress: [{}/{}] {}% ", index + 1, total_ports, percentage);
@@ -354,22 +392,33 @@ fn profile_scan() {
 
     print!("\r\x1b[2K");
 
-    println!("\n{} Scan Complete!", profile.get_name());
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!(
-        "Found {} open ports out of {} scanned",
+        "\n{}{}{} Scan Complete!{}",
+        GREEN,
+        BOLD,
+        profile.get_name(),
+        RESET
+    );
+    println!("{}", "━".repeat(33));
+    println!(
+        "Found {}{}{} open ports out of {} scanned",
+        GREEN,
         open_ports.len(),
+        RESET,
         total_ports
     );
 
     if !open_ports.is_empty() {
-        println!("\nSummary of open services:");
+        println!("\n{}Summary of open services{}:", YELLOW, RESET);
         for port in &open_ports {
             let service = get_service_name(*port);
-            println!("  • {:<15} on port {}", service, port);
+            println!(
+                "  {}•{} {}{:<15}{} on port {}{}{}",
+                GREEN, RESET, CYAN, service, RESET, YELLOW, port, RESET
+            );
         }
     } else {
-        println!("\nNo open ports found.");
+        println!("\n{}No open ports found.{}", YELLOW, RESET);
     }
 
     press_enter_to_continue();
@@ -377,13 +426,13 @@ fn profile_scan() {
 
 fn print_progress_bar(percentage: u32) {
     let bar_width: usize = 20;
-    let filled = (bar_width * percentage as usize / 100);
+    let filled = bar_width * percentage as usize / 100;
     let empty = bar_width.saturating_sub(filled);
 
     print!("[");
-    print!("{}", "=".repeat(filled));
+    print!("{}{}{}", GREEN, "=".repeat(filled), RESET);
     if filled < bar_width {
-        print!(">");
+        print!("{}>{}", YELLOW, RESET);
         if empty > 1 {
             print!("{}", " ".repeat(empty - 1));
         }
@@ -419,7 +468,10 @@ fn print_menu_items() {
         name: String::from("Vonogs Scanner"),
         version: 0.3,
     };
-    println!("{} v{}", my_scanner.name, my_scanner.version);
+    println!(
+        "{}{}{} v{}{}",
+        CYAN, BOLD, my_scanner.name, my_scanner.version, RESET
+    );
     println!("====================");
 
     let menu: [MenuItem; 3] = [MenuItem::CustomScan, MenuItem::ProfileScan, MenuItem::Exit];
@@ -445,21 +497,21 @@ fn clear_screen() {
 
 fn menu_fallback() {
     clear_screen();
-    println!("Please select option from the menu.");
+    println!("{}Please select option from the menu.{}", YELLOW, RESET);
     thread::sleep(Duration::from_millis(2000));
     print_menu_items();
 }
 
 fn end_program() {
-    println!("\nThank you for using Vonogs Scanner!");
-    println!("Goodbye!");
+    println!("\n{}Thank you for using Vonogs Scanner!{}", CYAN, RESET);
+    println!("{}Goodbye!{}", GREEN, RESET);
     thread::sleep(Duration::from_millis(1000));
     process::exit(0);
 }
 
 fn press_enter_with_message(message: &str) {
     let mut stdout = stdout();
-    write!(stdout, "\n{}", message).unwrap();
+    write!(stdout, "\n{}{}{}", YELLOW, message, RESET).unwrap();
     stdout.flush().unwrap();
     stdin().read(&mut [0]).unwrap();
 
