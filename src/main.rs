@@ -1,12 +1,15 @@
 mod services;
 
 use services::get_service_name;
+use std::fs::{self, File};
 use std::io;
 use std::io::{stdin, stdout, Read, Write};
 use std::net::SocketAddr;
 use std::net::TcpStream;
+use std::path::Path;
 use std::process;
-use std::{thread, time::Duration};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const RESET: &str = "\x1b[0m";
 const RED: &str = "\x1b[31m";
@@ -16,6 +19,7 @@ const CYAN: &str = "\x1b[36m";
 const BOLD: &str = "\x1b[1m";
 
 fn main() {
+    create_logs_directory();
     print_menu_items();
 
     let mut input_string: String = String::new();
@@ -32,6 +36,87 @@ fn main() {
             Err(_) => menu_fallback(),
         }
     }
+}
+
+fn create_logs_directory() {
+    if !Path::new("scan_logs").exists() {
+        let _ = fs::create_dir("scan_logs");
+    }
+}
+
+fn get_timestamp() -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let seconds = now % 60;
+    let minutes = (now / 60) % 60;
+    let hours = (now / 3600) % 24;
+    let total_days = now / 86400;
+
+    let year = 1970 + (total_days / 365);
+    let remaining_days = total_days % 365;
+    let month = remaining_days / 30 + 1;
+    let day = remaining_days % 30 + 1;
+
+    format!(
+        "{:04}-{:02}-{:02}_{:02}-{:02}-{:02}",
+        year, month, day, hours, minutes, seconds
+    )
+}
+
+fn create_log_file(scan_type: &str) -> File {
+    let timestamp = get_timestamp();
+    let filename = format!("scan_logs/scan_{}_{}.log", timestamp, scan_type);
+    File::create(&filename).unwrap_or_else(|_| {
+        println!("{}Warning: Could not create log file{}", YELLOW, RESET);
+        File::create("/dev/null").unwrap()
+    })
+}
+
+fn write_log_header(log_file: &mut File, scan_type: &str, target_ip: &str) {
+    let timestamp = get_timestamp();
+    let header = format!(
+        "=================================\n\
+         Vonogs Scanner Log\n\
+         =================================\n\
+         Scan Type: {}\n\
+         Target: {}\n\
+         Start Time: {}\n\
+         =================================\n\n",
+        scan_type, target_ip, timestamp
+    );
+    let _ = log_file.write_all(header.as_bytes());
+}
+
+fn write_log_entry(log_file: &mut File, message: &str) {
+    let _ = log_file.write_all(format!("{}\n", message).as_bytes());
+}
+
+fn write_log_summary(log_file: &mut File, open_ports: &Vec<u16>, total_scanned: u32) {
+    let summary = format!(
+        "\n=================================\n\
+         Scan Summary\n\
+         =================================\n\
+         Total Ports Scanned: {}\n\
+         Open Ports Found: {}\n",
+        total_scanned,
+        open_ports.len()
+    );
+    let _ = log_file.write_all(summary.as_bytes());
+
+    if !open_ports.is_empty() {
+        let _ = log_file.write_all(b"\nOpen Ports:\n");
+        for port in open_ports {
+            let service = get_service_name(*port);
+            let entry = format!("  Port {}: {} (OPEN)\n", port, service);
+            let _ = log_file.write_all(entry.as_bytes());
+        }
+    }
+
+    let end_time = format!("\nEnd Time: {}\n", get_timestamp());
+    let _ = log_file.write_all(end_time.as_bytes());
 }
 
 fn scanner() {
@@ -113,6 +198,13 @@ fn scanner() {
             return;
         }
 
+        let mut log_file = create_log_file("custom_range");
+        write_log_header(&mut log_file, "Custom Range Scan", ip_input);
+        write_log_entry(
+            &mut log_file,
+            &format!("Port Range: {}-{}", start_port, end_port),
+        );
+
         println!(
             "\nScanning ports {}{}-{}{} on {}{}{}",
             YELLOW, start_port, end_port, RESET, CYAN, ip_input, RESET
@@ -137,6 +229,7 @@ fn scanner() {
             let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
                 Ok(addr) => addr,
                 Err(_) => {
+                    write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
                     continue;
                 }
             };
@@ -151,6 +244,10 @@ fn scanner() {
                         YELLOW, port, RESET, CYAN, service_name, RESET, GREEN, BOLD, RESET
                     );
                     open_ports.push(port);
+                    write_log_entry(
+                        &mut log_file,
+                        &format!("Port {}: {} - OPEN", port, service_name),
+                    );
 
                     print!(
                         "Scanning port {} [{}/{}] {}% ",
@@ -160,7 +257,7 @@ fn scanner() {
                     io::stdout().flush().unwrap();
                 }
                 Err(_) => {
-                    // Don't print closed ports to reduce noise
+                    write_log_entry(&mut log_file, &format!("Port {}: CLOSED", port));
                 }
             }
         }
@@ -181,6 +278,9 @@ fn scanner() {
                 );
             }
         }
+
+        write_log_summary(&mut log_file, &open_ports, total_ports as u32);
+        println!("\n{}Log saved to scan_logs/{}", CYAN, RESET);
     } else {
         let mut port_input = String::new();
 
@@ -204,6 +304,13 @@ fn scanner() {
             }
         };
 
+        let mut log_file = create_log_file("single_port");
+        write_log_header(&mut log_file, "Single Port Scan", ip_input);
+        write_log_entry(
+            &mut log_file,
+            &format!("Target Port: {}", port_input_formatted),
+        );
+
         println!(
             "Scanning Port {}{}{} on IP address {}{}{}",
             YELLOW, port_input_formatted, RESET, CYAN, ip_input, RESET
@@ -221,10 +328,12 @@ fn scanner() {
                 Ok(addr) => addr,
                 Err(_) => {
                     println!("\n{}Invalid address format{}", RED, RESET);
+                    write_log_entry(&mut log_file, "Error: Invalid address format");
                     return;
                 }
             };
 
+        let mut open_ports = Vec::new();
         match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
             Ok(_) => {
                 let service_name = get_service_name(port_input_formatted);
@@ -232,9 +341,23 @@ fn scanner() {
                     " {}{}OPEN{} ({}{}{})",
                     GREEN, BOLD, RESET, CYAN, service_name, RESET
                 );
+                open_ports.push(port_input_formatted);
+                write_log_entry(
+                    &mut log_file,
+                    &format!("Port {}: {} - OPEN", port_input_formatted, service_name),
+                );
             }
-            Err(_) => println!(" {}CLOSED{}", RED, RESET),
+            Err(_) => {
+                println!(" {}CLOSED{}", RED, RESET);
+                write_log_entry(
+                    &mut log_file,
+                    &format!("Port {}: CLOSED", port_input_formatted),
+                );
+            }
         }
+
+        write_log_summary(&mut log_file, &open_ports, 1);
+        println!("\n{}Log saved to scan_logs/{}", CYAN, RESET);
     }
 
     press_enter_to_continue();
@@ -271,6 +394,15 @@ impl ScanProfile {
             ScanProfile::Web => "Web Services",
             ScanProfile::Database => "Database Services",
             ScanProfile::Full => "Full Common Ports",
+        }
+    }
+
+    fn get_log_name(&self) -> &str {
+        match self {
+            ScanProfile::Quick => "profile_quick",
+            ScanProfile::Web => "profile_web",
+            ScanProfile::Database => "profile_database",
+            ScanProfile::Full => "profile_full",
         }
     }
 }
@@ -324,8 +456,18 @@ fn profile_scan() {
         }
     };
 
+    let mut log_file = create_log_file(profile.get_log_name());
+    write_log_header(&mut log_file, profile.get_name(), ip_input);
+
     let ports_to_scan = profile.get_ports();
     let total_ports = ports_to_scan.len();
+
+    write_log_entry(&mut log_file, &format!("Profile: {}", profile.get_name()));
+    write_log_entry(
+        &mut log_file,
+        &format!("Total ports to scan: {}", total_ports),
+    );
+    write_log_entry(&mut log_file, &format!("Ports: {:?}\n", ports_to_scan));
 
     println!(
         "\n{}{}{} - Scanning {}{}{} ports on {}{}{}",
@@ -351,7 +493,10 @@ fn profile_scan() {
 
         let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
             Ok(addr) => addr,
-            Err(_) => continue,
+            Err(_) => {
+                write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
+                continue;
+            }
         };
 
         match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
@@ -372,12 +517,20 @@ fn profile_scan() {
                     RESET
                 );
                 open_ports.push(*port);
+                write_log_entry(
+                    &mut log_file,
+                    &format!("Port {}: {} - OPEN", port, service_name),
+                );
 
                 print!("Progress: [{}/{}] {}% ", index + 1, total_ports, percentage);
                 print_progress_bar(percentage);
                 io::stdout().flush().unwrap();
             }
             Err(_) => {
+                write_log_entry(
+                    &mut log_file,
+                    &format!("Port {}: {} - CLOSED", port, service_name),
+                );
                 print!(
                     "\rProgress: [{}/{}] {}% ",
                     index + 1,
@@ -420,6 +573,9 @@ fn profile_scan() {
     } else {
         println!("\n{}No open ports found.{}", YELLOW, RESET);
     }
+
+    write_log_summary(&mut log_file, &open_ports, total_ports as u32);
+    println!("\n{}Log saved to scan_logs/{}", CYAN, RESET);
 
     press_enter_to_continue();
 }
