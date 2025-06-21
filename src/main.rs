@@ -1,4 +1,5 @@
 mod services;
+mod validation;
 
 use services::get_service_name;
 use std::fs::{self, File};
@@ -10,6 +11,7 @@ use std::path::Path;
 use std::process;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use validation::is_valid_port_input;
 
 const RESET: &str = "\x1b[0m";
 const RED: &str = "\x1b[31m";
@@ -295,13 +297,13 @@ fn scanner() {
             }
         }
 
-        let port_input_formatted = match port_input.trim().parse::<u16>() {
-            Ok(port) => port,
-            Err(_) => {
-                println!("{}Failed to read port{}", RED, RESET);
-                menu_fallback();
-                return;
-            }
+        let port_input_formatted = if is_valid_port_input(&port_input) {
+            port_input.trim().parse::<u16>().unwrap()
+        } else {
+            println!("{}Invalid port number{}", RED, RESET);
+            thread::sleep(Duration::from_millis(2000));
+            menu_fallback();
+            return;
         };
 
         let mut log_file = create_log_file("single_port");
