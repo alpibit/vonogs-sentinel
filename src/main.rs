@@ -11,7 +11,7 @@ use std::path::Path;
 use std::process;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use validation::is_valid_port_input;
+use validation::{is_valid_ip, is_valid_port_input};
 
 const RESET: &str = "\x1b[0m";
 const RED: &str = "\x1b[31m";
@@ -138,6 +138,13 @@ fn scanner() {
     }
 
     let ip_input = ip_input.trim();
+
+    if !is_valid_ip(ip_input) {
+        println!("{}Invalid IP address format{}", RED, RESET);
+        thread::sleep(Duration::from_millis(2000));
+        menu_fallback();
+        return;
+    }
 
     println!("Scan multiple ports? (y/n)");
     let mut multi_choice = String::new();
@@ -433,6 +440,13 @@ fn profile_scan() {
         }
     }
     let ip_input = ip_input.trim();
+
+    if !is_valid_ip(ip_input) {
+        println!("{}Invalid IP address format{}", RED, RESET);
+        thread::sleep(Duration::from_millis(2000));
+        menu_fallback();
+        return;
+    }
 
     println!("\n{}Select scan profile{}:", YELLOW, RESET);
     println!("1. Quick Scan (17 ports)");
