@@ -7,6 +7,7 @@ use std::io;
 use std::io::{stdin, stdout, Read, Write};
 use std::net::SocketAddr;
 use std::net::TcpStream;
+use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::process;
 use std::thread;
@@ -121,15 +122,19 @@ fn write_log_summary(log_file: &mut File, open_ports: &Vec<u16>, total_scanned: 
     let _ = log_file.write_all(end_time.as_bytes());
 }
 
+fn resolve_addr(target: &str, port: u16) -> Option<SocketAddr> {
+    (target, port).to_socket_addrs().ok()?.next()
+}
+
 fn scanner() {
     clear_screen();
 
     let mut ip_input = String::new();
 
-    println!("Please enter IP address");
+    println!("Please enter IP address or hostname");
     ip_input.clear();
     match io::stdin().read_line(&mut ip_input) {
-        Ok(_) => println!("Selected IP address {}{}{}", CYAN, ip_input.trim(), RESET),
+        Ok(_) => println!("Selected target {}{}{}", CYAN, ip_input.trim(), RESET),
         Err(_) => {
             println!("{}Failed to read IP address{}", RED, RESET);
             menu_fallback();
@@ -140,10 +145,11 @@ fn scanner() {
     let ip_input = ip_input.trim();
 
     if !is_valid_ip(ip_input) {
-        println!("{}Invalid IP address format{}", RED, RESET);
-        thread::sleep(Duration::from_millis(2000));
-        menu_fallback();
-        return;
+        println!(
+            "{}Note: '{}' is not a literal IP address; attempting DNS resolution...{}",
+            YELLOW, ip_input, RESET
+        );
+        thread::sleep(Duration::from_millis(500));
     }
 
     println!("Scan multiple ports? (y/n)");
@@ -235,9 +241,9 @@ fn scanner() {
             print_progress_bar(percentage);
             io::stdout().flush().unwrap();
 
-            let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
-                Ok(addr) => addr,
-                Err(_) => {
+            let socket_addr = match resolve_addr(ip_input, port) {
+                Some(addr) => addr,
+                None => {
                     write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
                     continue;
                 }
@@ -332,15 +338,14 @@ fn scanner() {
             thread::sleep(Duration::from_millis(300));
         }
 
-        let socket_addr =
-            match format!("{}:{}", ip_input, port_input_formatted).parse::<SocketAddr>() {
-                Ok(addr) => addr,
-                Err(_) => {
-                    println!("\n{}Invalid address format{}", RED, RESET);
-                    write_log_entry(&mut log_file, "Error: Invalid address format");
-                    return;
-                }
-            };
+        let socket_addr = match resolve_addr(ip_input, port_input_formatted) {
+            Some(addr) => addr,
+            None => {
+                println!("\n{}Invalid address format{}", RED, RESET);
+                write_log_entry(&mut log_file, "Error: Invalid address format");
+                return;
+            }
+        };
 
         let mut open_ports = Vec::new();
         match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
@@ -430,7 +435,7 @@ fn profile_scan() {
     );
 
     let mut ip_input = String::new();
-    println!("Please enter IP address:");
+    println!("Please enter IP address or hostname:");
     match io::stdin().read_line(&mut ip_input) {
         Ok(_) => {}
         Err(_) => {
@@ -442,10 +447,11 @@ fn profile_scan() {
     let ip_input = ip_input.trim();
 
     if !is_valid_ip(ip_input) {
-        println!("{}Invalid IP address format{}", RED, RESET);
-        thread::sleep(Duration::from_millis(2000));
-        menu_fallback();
-        return;
+        println!(
+            "{}Note: '{}' is not a literal IP address; attempting DNS resolution...{}",
+            YELLOW, ip_input, RESET
+        );
+        thread::sleep(Duration::from_millis(500));
     }
 
     println!("\n{}Select scan profile{}:", YELLOW, RESET);
@@ -513,9 +519,9 @@ fn profile_scan() {
         print!("\rScanning {} ({})... ", service_name, port);
         io::stdout().flush().unwrap();
 
-        let socket_addr = match format!("{}:{}", ip_input, port).parse::<SocketAddr>() {
-            Ok(addr) => addr,
-            Err(_) => {
+        let socket_addr = match resolve_addr(ip_input, *port) {
+            Some(addr) => addr,
+            None => {
                 write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
                 continue;
             }
