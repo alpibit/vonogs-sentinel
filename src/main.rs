@@ -5,14 +5,13 @@ use services::get_service_name;
 use std::fs::{self, File};
 use std::io;
 use std::io::{stdin, stdout, Read, Write};
-use std::net::SocketAddr;
 use std::net::TcpStream;
 use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::process;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use validation::{is_valid_ip, is_valid_port_input};
+use validation::{is_valid_ip, is_valid_port, is_valid_port_input};
 
 const RESET: &str = "\x1b[0m";
 const RED: &str = "\x1b[31m";
@@ -122,8 +121,26 @@ fn write_log_summary(log_file: &mut File, open_ports: &Vec<u16>, total_scanned: 
     let _ = log_file.write_all(end_time.as_bytes());
 }
 
-fn resolve_addr(target: &str, port: u16) -> Option<SocketAddr> {
-    (target, port).to_socket_addrs().ok()?.next()
+fn resolve_addr(target: &str, port: u16) -> Option<std::net::SocketAddr> {
+    let mut last_v6 = None;
+    if let Ok(iter) = (target, port).to_socket_addrs() {
+        for addr in iter {
+            if addr.is_ipv4() {
+                return Some(addr);
+            } else {
+                last_v6 = Some(addr);
+            }
+        }
+    }
+    last_v6
+}
+
+fn connect_timeout() -> Duration {
+    std::env::var("VONOGS_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .map(Duration::from_millis)
+        .unwrap_or(Duration::from_millis(700))
 }
 
 fn scanner() {
@@ -145,11 +162,18 @@ fn scanner() {
     let ip_input = ip_input.trim();
 
     if !is_valid_ip(ip_input) {
-        println!(
-            "{}Note: '{}' is not a literal IP address; attempting DNS resolution...{}",
-            YELLOW, ip_input, RESET
-        );
-        thread::sleep(Duration::from_millis(500));
+        if (ip_input, 80)
+            .to_socket_addrs()
+            .ok()
+            .and_then(|mut i| i.next())
+            .is_none()
+        {
+            println!(
+                "{}Note: '{}' could not be resolved{}",
+                YELLOW, ip_input, RESET
+            );
+            thread::sleep(Duration::from_millis(500));
+        }
     }
 
     println!("Scan multiple ports? (y/n)");
@@ -207,6 +231,18 @@ fn scanner() {
             }
         };
 
+        if !is_valid_port(start_port) {
+            println!("{}Invalid start port{}", RED, RESET);
+            menu_fallback();
+            return;
+        }
+
+        if !is_valid_port(end_port) {
+            println!("{}Invalid end port{}", RED, RESET);
+            menu_fallback();
+            return;
+        }
+
         if start_port > end_port {
             println!("{}Start port must be less than end port{}", RED, RESET);
             menu_fallback();
@@ -249,7 +285,7 @@ fn scanner() {
                 }
             };
 
-            match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(1)) {
+            match TcpStream::connect_timeout(&socket_addr, connect_timeout()) {
                 Ok(_) => {
                     print!("\r");
                     print!("{}", " ".repeat(60));
@@ -319,6 +355,13 @@ fn scanner() {
             return;
         };
 
+        if !is_valid_port(port_input_formatted) {
+            println!("{}Invalid port number{}", RED, RESET);
+            thread::sleep(Duration::from_millis(2000));
+            menu_fallback();
+            return;
+        }
+
         let mut log_file = create_log_file("single_port");
         write_log_header(&mut log_file, "Single Port Scan", ip_input);
         write_log_entry(
@@ -348,7 +391,7 @@ fn scanner() {
         };
 
         let mut open_ports = Vec::new();
-        match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(3)) {
+        match TcpStream::connect_timeout(&socket_addr, connect_timeout()) {
             Ok(_) => {
                 let service_name = get_service_name(port_input_formatted);
                 println!(
@@ -527,7 +570,7 @@ fn profile_scan() {
             }
         };
 
-        match TcpStream::connect_timeout(&socket_addr, Duration::from_millis(500)) {
+        match TcpStream::connect_timeout(&socket_addr, connect_timeout()) {
             Ok(_) => {
                 print!("\r\x1b[2K");
                 println!(

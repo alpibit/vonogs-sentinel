@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 
 pub fn is_valid_port(port: u16) -> bool {
-    port > 0
+    port != 0
 }
 
 pub fn is_valid_port_input(input: &str) -> bool {
