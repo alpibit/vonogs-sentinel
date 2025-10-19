@@ -498,10 +498,22 @@ fn profile_scan() {
     }
 
     println!("\n{}Select scan profile{}:", YELLOW, RESET);
-    println!("1. Quick Scan (17 ports)");
-    println!("2. Web Services (16 ports)");
-    println!("3. Database Services (14 ports)");
-    println!("4. Full Scan (50 ports)");
+    println!(
+        "1. Quick Scan ({} ports)",
+        ScanProfile::Quick.get_ports().len()
+    );
+    println!(
+        "2. Web Services ({} ports)",
+        ScanProfile::Web.get_ports().len()
+    );
+    println!(
+        "3. Database Services ({} ports)",
+        ScanProfile::Database.get_ports().len()
+    );
+    println!(
+        "4. Full Scan ({} ports)",
+        ScanProfile::Full.get_ports().len()
+    );
     print!("\nYour choice: ");
     io::stdout().flush().unwrap();
 
