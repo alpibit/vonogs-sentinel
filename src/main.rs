@@ -307,8 +307,13 @@ fn scanner() {
                     print_progress_bar(percentage);
                     io::stdout().flush().unwrap();
                 }
-                Err(_) => {
-                    write_log_entry(&mut log_file, &format!("Port {}: CLOSED", port));
+                Err(e) => {
+                    let status = if e.kind() == io::ErrorKind::TimedOut {
+                        "TIMEOUT/FILTERED"
+                    } else {
+                        "CLOSED"
+                    };
+                    write_log_entry(&mut log_file, &format!("Port {}: {}", port, status));
                 }
             }
         }
@@ -404,12 +409,20 @@ fn scanner() {
                     &format!("Port {}: {} - OPEN", port_input_formatted, service_name),
                 );
             }
-            Err(_) => {
-                println!(" {}CLOSED{}", RED, RESET);
-                write_log_entry(
-                    &mut log_file,
-                    &format!("Port {}: CLOSED", port_input_formatted),
-                );
+            Err(e) => {
+                if e.kind() == io::ErrorKind::TimedOut {
+                    println!(" {}TIMEOUT/FILTERED{}", YELLOW, RESET);
+                    write_log_entry(
+                        &mut log_file,
+                        &format!("Port {}: TIMEOUT/FILTERED", port_input_formatted),
+                    );
+                } else {
+                    println!(" {}CLOSED{}", RED, RESET);
+                    write_log_entry(
+                        &mut log_file,
+                        &format!("Port {}: CLOSED", port_input_formatted),
+                    );
+                }
             }
         }
 
@@ -609,10 +622,15 @@ fn profile_scan() {
                 print_progress_bar(percentage);
                 io::stdout().flush().unwrap();
             }
-            Err(_) => {
+            Err(e) => {
+                let status = if e.kind() == io::ErrorKind::TimedOut {
+                    "TIMEOUT/FILTERED"
+                } else {
+                    "CLOSED"
+                };
                 write_log_entry(
                     &mut log_file,
-                    &format!("Port {}: {} - CLOSED", port, service_name),
+                    &format!("Port {}: {} - {}", port, service_name, status),
                 );
                 print!(
                     "\rProgress: [{}/{}] {}% ",
