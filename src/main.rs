@@ -68,13 +68,17 @@ fn get_timestamp() -> String {
     )
 }
 
-fn create_log_file(scan_type: &str) -> File {
+fn create_log_file(scan_type: &str) -> (File, String) {
     let timestamp = get_timestamp();
     let filename = format!("scan_logs/scan_{}_{}.log", timestamp, scan_type);
-    File::create(&filename).unwrap_or_else(|_| {
-        println!("{}Warning: Could not create log file{}", YELLOW, RESET);
-        File::create("/dev/null").unwrap()
-    })
+    match File::create(&filename) {
+        Ok(f) => (f, filename),
+        Err(_) => {
+            println!("{}Warning: Could not create log file{}", YELLOW, RESET);
+            let f = File::create("/dev/null").unwrap();
+            (f, String::from("(no log file created)"))
+        }
+    }
 }
 
 fn write_log_header(log_file: &mut File, scan_type: &str, target_ip: &str) {
@@ -249,7 +253,7 @@ fn scanner() {
             return;
         }
 
-        let mut log_file = create_log_file("custom_range");
+        let (mut log_file, log_path) = create_log_file("custom_range");
         write_log_header(&mut log_file, "Custom Range Scan", ip_input);
         write_log_entry(
             &mut log_file,
@@ -336,7 +340,7 @@ fn scanner() {
         }
 
         write_log_summary(&mut log_file, &open_ports, total_ports as u32);
-        println!("\n{}Log saved to scan_logs/{}", CYAN, RESET);
+        println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     } else {
         let mut port_input = String::new();
 
@@ -367,7 +371,7 @@ fn scanner() {
             return;
         }
 
-        let mut log_file = create_log_file("single_port");
+        let (mut log_file, log_path) = create_log_file("single_port");
         write_log_header(&mut log_file, "Single Port Scan", ip_input);
         write_log_entry(
             &mut log_file,
@@ -427,7 +431,7 @@ fn scanner() {
         }
 
         write_log_summary(&mut log_file, &open_ports, 1);
-        println!("\n{}Log saved to scan_logs/{}", CYAN, RESET);
+        println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     }
 
     press_enter_to_continue();
@@ -552,7 +556,7 @@ fn profile_scan() {
         }
     };
 
-    let mut log_file = create_log_file(profile.get_log_name());
+    let (mut log_file, log_path) = create_log_file(profile.get_log_name());
     write_log_header(&mut log_file, profile.get_name(), ip_input);
 
     let ports_to_scan = profile.get_ports();
@@ -676,7 +680,7 @@ fn profile_scan() {
     }
 
     write_log_summary(&mut log_file, &open_ports, total_ports as u32);
-    println!("\n{}Log saved to scan_logs/{}", CYAN, RESET);
+    println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
 
     press_enter_to_continue();
 }
