@@ -10,7 +10,7 @@ use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::process;
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use validation::{is_valid_ip, is_valid_port, is_valid_port_input};
 
 const RESET: &str = "\x1b[0m";
@@ -100,15 +100,22 @@ fn write_log_entry(log_file: &mut File, message: &str) {
     let _ = log_file.write_all(format!("{}\n", message).as_bytes());
 }
 
-fn write_log_summary(log_file: &mut File, open_ports: &Vec<u16>, total_scanned: u32) {
+fn write_log_summary(
+    log_file: &mut File,
+    open_ports: &Vec<u16>,
+    total_scanned: u32,
+    elapsed_secs: f32,
+) {
     let summary = format!(
         "\n=================================\n\
          Scan Summary\n\
          =================================\n\
          Total Ports Scanned: {}\n\
-         Open Ports Found: {}\n",
+         Open Ports Found: {}\n\
+         Scan Duration: {:.2} seconds\n",
         total_scanned,
-        open_ports.len()
+        open_ports.len(),
+        elapsed_secs
     );
     let _ = log_file.write_all(summary.as_bytes());
 
@@ -149,6 +156,7 @@ fn connect_timeout() -> Duration {
 
 fn scanner() {
     clear_screen();
+    let scan_started = Instant::now();
 
     let mut ip_input = String::new();
 
@@ -326,8 +334,11 @@ fn scanner() {
         print!("{}", " ".repeat(60));
         print!("\r");
 
+        let elapsed = scan_started.elapsed().as_secs_f32();
+
         println!("\n{}{}Scan complete!{}", GREEN, BOLD, RESET);
         println!("Found {}{}{} open ports", GREEN, open_ports.len(), RESET);
+        println!("{}Scan took {:.2} seconds{}", CYAN, elapsed, RESET);
         if !open_ports.is_empty() {
             println!("\n{}Open ports{}:", YELLOW, RESET);
             for port in open_ports.iter() {
@@ -339,7 +350,7 @@ fn scanner() {
             }
         }
 
-        write_log_summary(&mut log_file, &open_ports, total_ports as u32);
+        write_log_summary(&mut log_file, &open_ports, total_ports as u32, elapsed);
         println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     } else {
         let mut port_input = String::new();
@@ -430,7 +441,10 @@ fn scanner() {
             }
         }
 
-        write_log_summary(&mut log_file, &open_ports, 1);
+        let elapsed = scan_started.elapsed().as_secs_f32();
+
+        write_log_summary(&mut log_file, &open_ports, 1, elapsed);
+        println!("{}Scan took {:.2} seconds{}", CYAN, elapsed, RESET);
         println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     }
 
@@ -489,6 +503,8 @@ impl ScanProfile {
 
 fn profile_scan() {
     clear_screen();
+    let scan_started = Instant::now();
+
     println!(
         "{}{}=== Profile-Based Port Scanner ==={}\n",
         YELLOW, BOLD, RESET
@@ -650,6 +666,8 @@ fn profile_scan() {
 
     print!("\r\x1b[2K");
 
+    let elapsed = scan_started.elapsed().as_secs_f32();
+
     println!(
         "\n{}{}{} Scan Complete!{}",
         GREEN,
@@ -665,6 +683,7 @@ fn profile_scan() {
         RESET,
         total_ports
     );
+    println!("{}Scan took {:.2} seconds{}", CYAN, elapsed, RESET);
 
     if !open_ports.is_empty() {
         println!("\n{}Summary of open services{}:", YELLOW, RESET);
@@ -679,7 +698,7 @@ fn profile_scan() {
         println!("\n{}No open ports found.{}", YELLOW, RESET);
     }
 
-    write_log_summary(&mut log_file, &open_ports, total_ports as u32);
+    write_log_summary(&mut log_file, &open_ports, total_ports as u32, elapsed);
     println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
 
     press_enter_to_continue();
