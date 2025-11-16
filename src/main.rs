@@ -154,6 +154,42 @@ fn connect_timeout() -> Duration {
         .unwrap_or(Duration::from_millis(700))
 }
 
+fn print_target_resolution(target: &str) {
+    if is_valid_ip(target) {
+        return;
+    }
+
+    match (target, 80).to_socket_addrs() {
+        Ok(mut iter) => {
+            if let Some(addr) = iter.next() {
+                println!(
+                    "{}Resolved {}{}{} to {}{}{}",
+                    YELLOW,
+                    CYAN,
+                    target,
+                    RESET,
+                    CYAN,
+                    addr.ip(),
+                    RESET
+                );
+            } else {
+                println!(
+                    "{}Note: '{}' could not be resolved{}",
+                    YELLOW, target, RESET
+                );
+                thread::sleep(Duration::from_millis(500));
+            }
+        }
+        Err(_) => {
+            println!(
+                "{}Note: '{}' could not be resolved{}",
+                YELLOW, target, RESET
+            );
+            thread::sleep(Duration::from_millis(500));
+        }
+    }
+}
+
 fn scanner() {
     clear_screen();
     let scan_started = Instant::now();
@@ -173,20 +209,7 @@ fn scanner() {
 
     let ip_input = ip_input.trim();
 
-    if !is_valid_ip(ip_input) {
-        if (ip_input, 80)
-            .to_socket_addrs()
-            .ok()
-            .and_then(|mut i| i.next())
-            .is_none()
-        {
-            println!(
-                "{}Note: '{}' could not be resolved{}",
-                YELLOW, ip_input, RESET
-            );
-            thread::sleep(Duration::from_millis(500));
-        }
-    }
+    print_target_resolution(ip_input);
 
     println!("Scan multiple ports? (y/n)");
     let mut multi_choice = String::new();
@@ -522,13 +545,7 @@ fn profile_scan() {
     }
     let ip_input = ip_input.trim();
 
-    if !is_valid_ip(ip_input) {
-        println!(
-            "{}Note: '{}' is not a literal IP address; attempting DNS resolution...{}",
-            YELLOW, ip_input, RESET
-        );
-        thread::sleep(Duration::from_millis(500));
-    }
+    print_target_resolution(ip_input);
 
     println!("\n{}Select scan profile{}:", YELLOW, RESET);
     println!(
