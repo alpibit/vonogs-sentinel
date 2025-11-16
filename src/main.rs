@@ -154,14 +154,15 @@ fn connect_timeout() -> Duration {
         .unwrap_or(Duration::from_millis(700))
 }
 
-fn print_target_resolution(target: &str) {
+fn resolve_target_note(target: &str) -> Option<String> {
     if is_valid_ip(target) {
-        return;
+        return None;
     }
 
     match (target, 80).to_socket_addrs() {
         Ok(mut iter) => {
             if let Some(addr) = iter.next() {
+                let note = format!("Resolved Target: {} -> {}", target, addr.ip());
                 println!(
                     "{}Resolved {}{}{} to {}{}{}",
                     YELLOW,
@@ -172,20 +173,25 @@ fn print_target_resolution(target: &str) {
                     addr.ip(),
                     RESET
                 );
+                Some(note)
             } else {
+                let note = format!("Resolution failed for '{}'", target);
                 println!(
                     "{}Note: '{}' could not be resolved{}",
                     YELLOW, target, RESET
                 );
                 thread::sleep(Duration::from_millis(500));
+                Some(note)
             }
         }
         Err(_) => {
+            let note = format!("Resolution failed for '{}'", target);
             println!(
                 "{}Note: '{}' could not be resolved{}",
                 YELLOW, target, RESET
             );
             thread::sleep(Duration::from_millis(500));
+            Some(note)
         }
     }
 }
@@ -209,7 +215,7 @@ fn scanner() {
 
     let ip_input = ip_input.trim();
 
-    print_target_resolution(ip_input);
+    let resolution_note = resolve_target_note(ip_input);
 
     println!("Scan multiple ports? (y/n)");
     let mut multi_choice = String::new();
@@ -286,6 +292,9 @@ fn scanner() {
 
         let (mut log_file, log_path) = create_log_file("custom_range");
         write_log_header(&mut log_file, "Custom Range Scan", ip_input);
+        if let Some(note) = &resolution_note {
+            write_log_entry(&mut log_file, note);
+        }
         write_log_entry(
             &mut log_file,
             &format!("Port Range: {}-{}", start_port, end_port),
@@ -407,6 +416,9 @@ fn scanner() {
 
         let (mut log_file, log_path) = create_log_file("single_port");
         write_log_header(&mut log_file, "Single Port Scan", ip_input);
+        if let Some(note) = &resolution_note {
+            write_log_entry(&mut log_file, note);
+        }
         write_log_entry(
             &mut log_file,
             &format!("Target Port: {}", port_input_formatted),
@@ -545,7 +557,7 @@ fn profile_scan() {
     }
     let ip_input = ip_input.trim();
 
-    print_target_resolution(ip_input);
+    let resolution_note = resolve_target_note(ip_input);
 
     println!("\n{}Select scan profile{}:", YELLOW, RESET);
     println!(
@@ -591,6 +603,9 @@ fn profile_scan() {
 
     let (mut log_file, log_path) = create_log_file(profile.get_log_name());
     write_log_header(&mut log_file, profile.get_name(), ip_input);
+    if let Some(note) = &resolution_note {
+        write_log_entry(&mut log_file, note);
+    }
 
     let ports_to_scan = profile.get_ports();
     let total_ports = ports_to_scan.len();
