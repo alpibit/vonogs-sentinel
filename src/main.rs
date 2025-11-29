@@ -24,12 +24,9 @@ fn main() {
     create_logs_directory();
     print_menu_items();
 
-    let mut input_string: String = String::new();
-
     loop {
-        input_string.clear();
-        match io::stdin().read_line(&mut input_string) {
-            Ok(_) => match input_string.as_str().trim() {
+        match read_input("") {
+            Ok(input) => match input.as_str() {
                 "1" => scanner(),
                 "2" => profile_scan(),
                 "3" => end_program(),
@@ -44,6 +41,17 @@ fn create_logs_directory() {
     if !Path::new("scan_logs").exists() {
         let _ = fs::create_dir("scan_logs");
     }
+}
+
+fn read_input(prompt: &str) -> io::Result<String> {
+    if !prompt.is_empty() {
+        print!("{}", prompt);
+        io::stdout().flush().unwrap();
+    }
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
 }
 
 fn get_timestamp() -> String {
@@ -200,35 +208,34 @@ fn scanner() {
     clear_screen();
     let scan_started = Instant::now();
 
-    let mut ip_input = String::new();
-
     println!("Please enter IP address or hostname");
-    ip_input.clear();
-    match io::stdin().read_line(&mut ip_input) {
-        Ok(_) => println!("Selected target {}{}{}", CYAN, ip_input.trim(), RESET),
+    let ip_input_raw = match read_input("") {
+        Ok(input) => {
+            println!("Selected target {}{}{}", CYAN, input.as_str(), RESET);
+            input
+        }
         Err(_) => {
             println!("{}Failed to read IP address{}", RED, RESET);
             menu_fallback();
             return;
         }
-    }
+    };
 
-    let ip_input = ip_input.trim();
+    let ip_input = ip_input_raw.as_str();
 
     let resolution_note = resolve_target_note(ip_input);
 
     println!("Scan multiple ports? (y/n)");
-    let mut multi_choice = String::new();
-    match io::stdin().read_line(&mut multi_choice) {
-        Ok(_) => {}
+    let multi_choice = match read_input("") {
+        Ok(input) => input,
         Err(_) => {
             println!("{}Failed to read choice{}", RED, RESET);
             menu_fallback();
             return;
         }
-    }
+    };
 
-    if multi_choice.trim().to_lowercase() == "y" {
+    if multi_choice.to_lowercase() == "y" {
         let mut start_port_input = String::new();
         let mut end_port_input = String::new();
 
