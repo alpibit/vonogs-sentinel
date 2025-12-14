@@ -236,25 +236,30 @@ fn scanner() {
     };
 
     if multi_choice.to_lowercase() == "y" {
+        let mut start_port_input = String::new();
+        let mut end_port_input = String::new();
+
         println!("Please enter START port number");
-        let start_port_input = match read_input("") {
-            Ok(input) => input,
+        start_port_input.clear();
+        match io::stdin().read_line(&mut start_port_input) {
+            Ok(_) => {}
             Err(_) => {
                 println!("{}Failed to read start port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
-        };
+        }
 
         println!("Please enter END port number");
-        let end_port_input = match read_input("") {
-            Ok(input) => input,
+        end_port_input.clear();
+        match io::stdin().read_line(&mut end_port_input) {
+            Ok(_) => {}
             Err(_) => {
                 println!("{}Failed to read end port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
-        };
+        }
 
         let start_port = match start_port_input.trim().parse::<u16>() {
             Ok(port) => port,
@@ -387,18 +392,18 @@ fn scanner() {
         write_log_summary(&mut log_file, &open_ports, total_ports as u32, elapsed);
         println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     } else {
+        let mut port_input = String::new();
+
         println!("Please enter Port number");
-        let port_input = match read_input("") {
-            Ok(input) => {
-                println!("Selected Port {}{}{}", CYAN, input.trim(), RESET);
-                input
-            }
+        port_input.clear();
+        match io::stdin().read_line(&mut port_input) {
+            Ok(_) => println!("Selected Port {}{}{}", CYAN, port_input.trim(), RESET),
             Err(_) => {
                 println!("{}Failed to read port{}", RED, RESET);
                 menu_fallback();
                 return;
             }
-        };
+        }
 
         let port_input_formatted = if is_valid_port_input(&port_input) {
             port_input.trim().parse::<u16>().unwrap()
@@ -548,7 +553,7 @@ fn profile_scan() {
     );
 
     println!("Please enter IP address or hostname:");
-    let ip_input_string = match read_input("") {
+    let ip_input = match read_input("") {
         Ok(input) => input,
         Err(_) => {
             println!("{}Failed to read IP address{}", RED, RESET);
@@ -556,9 +561,8 @@ fn profile_scan() {
             return;
         }
     };
-    let ip_input = ip_input_string.as_str();
 
-    let resolution_note = resolve_target_note(ip_input);
+    let resolution_note = resolve_target_note(ip_input.as_str());
 
     println!("\n{}Select scan profile{}:", YELLOW, RESET);
     println!(
@@ -602,7 +606,7 @@ fn profile_scan() {
     };
 
     let (mut log_file, log_path) = create_log_file(profile.get_log_name());
-    write_log_header(&mut log_file, profile.get_name(), ip_input);
+    write_log_header(&mut log_file, profile.get_name(), ip_input.as_str());
     if let Some(note) = &resolution_note {
         write_log_entry(&mut log_file, note);
     }
@@ -639,7 +643,7 @@ fn profile_scan() {
         print!("\rScanning {} ({})... ", service_name, port);
         io::stdout().flush().unwrap();
 
-        let socket_addr = match resolve_addr(ip_input, *port) {
+        let socket_addr = match resolve_addr(ip_input.as_str(), *port) {
             Some(addr) => addr,
             None => {
                 write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
