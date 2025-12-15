@@ -54,6 +54,17 @@ fn read_input(prompt: &str) -> io::Result<String> {
     Ok(input.trim().to_string())
 }
 
+fn read_u16(prompt: &str) -> io::Result<u16> {
+    let input = read_input(prompt)?;
+    match input.trim().parse::<u16>() {
+        Ok(port) => Ok(port),
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Invalid number",
+        )),
+    }
+}
+
 fn get_timestamp() -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -236,44 +247,29 @@ fn scanner() {
     };
 
     if multi_choice.to_lowercase() == "y" {
-        let mut start_port_input = String::new();
-        let mut end_port_input = String::new();
-
         println!("Please enter START port number");
-        start_port_input.clear();
-        match io::stdin().read_line(&mut start_port_input) {
-            Ok(_) => {}
-            Err(_) => {
-                println!("{}Failed to read start port{}", RED, RESET);
-                menu_fallback();
-                return;
-            }
-        }
-
-        println!("Please enter END port number");
-        end_port_input.clear();
-        match io::stdin().read_line(&mut end_port_input) {
-            Ok(_) => {}
-            Err(_) => {
-                println!("{}Failed to read end port{}", RED, RESET);
-                menu_fallback();
-                return;
-            }
-        }
-
-        let start_port = match start_port_input.trim().parse::<u16>() {
+        let start_port = match read_u16("") {
             Ok(port) => port,
-            Err(_) => {
-                println!("{}Invalid start port{}", RED, RESET);
+            Err(e) => {
+                if e.kind() == io::ErrorKind::InvalidInput {
+                    println!("{}Invalid start port{}", RED, RESET);
+                } else {
+                    println!("{}Failed to read start port{}", RED, RESET);
+                }
                 menu_fallback();
                 return;
             }
         };
 
-        let end_port = match end_port_input.trim().parse::<u16>() {
+        println!("Please enter END port number");
+        let end_port = match read_u16("") {
             Ok(port) => port,
-            Err(_) => {
-                println!("{}Invalid end port{}", RED, RESET);
+            Err(e) => {
+                if e.kind() == io::ErrorKind::InvalidInput {
+                    println!("{}Invalid end port{}", RED, RESET);
+                } else {
+                    println!("{}Failed to read end port{}", RED, RESET);
+                }
                 menu_fallback();
                 return;
             }
