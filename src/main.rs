@@ -11,7 +11,7 @@ use std::path::Path;
 use std::process;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use validation::{is_valid_ip, is_valid_port, is_valid_port_input};
+use validation::{is_valid_ip, is_valid_port};
 
 const RESET: &str = "\x1b[0m";
 const RED: &str = "\x1b[31m";
