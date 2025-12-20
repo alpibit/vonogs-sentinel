@@ -253,6 +253,7 @@ fn scanner() {
             Err(e) => {
                 if e.kind() == io::ErrorKind::InvalidInput {
                     println!("{}Invalid start port{}", RED, RESET);
+                    thread::sleep(Duration::from_millis(2000));
                 } else {
                     println!("{}Failed to read start port{}", RED, RESET);
                 }
@@ -267,6 +268,7 @@ fn scanner() {
             Err(e) => {
                 if e.kind() == io::ErrorKind::InvalidInput {
                     println!("{}Invalid end port{}", RED, RESET);
+                    thread::sleep(Duration::from_millis(2000));
                 } else {
                     println!("{}Failed to read end port{}", RED, RESET);
                 }
@@ -388,26 +390,22 @@ fn scanner() {
         write_log_summary(&mut log_file, &open_ports, total_ports as u32, elapsed);
         println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     } else {
-        let mut port_input = String::new();
-
         println!("Please enter Port number");
-        port_input.clear();
-        match io::stdin().read_line(&mut port_input) {
-            Ok(_) => println!("Selected Port {}{}{}", CYAN, port_input.trim(), RESET),
-            Err(_) => {
-                println!("{}Failed to read port{}", RED, RESET);
+        let port_input_formatted = match read_u16("") {
+            Ok(port) => {
+                println!("Selected Port {}{}{}", CYAN, port, RESET);
+                port
+            }
+            Err(e) => {
+                if e.kind() == io::ErrorKind::InvalidInput {
+                    println!("{}Invalid port number{}", RED, RESET);
+                    thread::sleep(Duration::from_millis(2000));
+                } else {
+                    println!("{}Failed to read port{}", RED, RESET);
+                }
                 menu_fallback();
                 return;
             }
-        }
-
-        let port_input_formatted = if is_valid_port_input(&port_input) {
-            port_input.trim().parse::<u16>().unwrap()
-        } else {
-            println!("{}Invalid port number{}", RED, RESET);
-            thread::sleep(Duration::from_millis(2000));
-            menu_fallback();
-            return;
         };
 
         if !is_valid_port(port_input_formatted) {
