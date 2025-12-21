@@ -65,21 +65,61 @@ fn read_u16(prompt: &str) -> io::Result<u16> {
     }
 }
 
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
 fn get_timestamp() -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+        .unwrap();
 
-    let seconds = now % 60;
-    let minutes = (now / 60) % 60;
-    let hours = (now / 3600) % 24;
-    let total_days = now / 86400;
+    let secs = now.as_secs();
 
-    let year = 1970 + (total_days / 365);
-    let remaining_days = total_days % 365;
-    let month = remaining_days / 30 + 1;
-    let day = remaining_days % 30 + 1;
+    let seconds = (secs % 60) as u32;
+    let minutes = ((secs / 60) % 60) as u32;
+    let hours = ((secs / 3600) % 24) as u32;
+
+    let mut days = (secs / 86_400) as i64;
+
+    let mut year: i32 = 1970;
+    loop {
+        let year_days = if is_leap_year(year) { 366 } else { 365 };
+        if days >= year_days {
+            days -= year_days;
+            year += 1;
+        } else {
+            break;
+        }
+    }
+
+    let leap = is_leap_year(year);
+    let month_lengths = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+
+    let mut month: u32 = 1;
+    for &len in &month_lengths {
+        if days >= len as i64 {
+            days -= len as i64;
+            month += 1;
+        } else {
+            break;
+        }
+    }
+
+    let day = (days + 1) as u32;
 
     format!(
         "{:04}-{:02}-{:02}_{:02}-{:02}-{:02}",
