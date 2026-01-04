@@ -70,9 +70,7 @@ fn is_leap_year(year: i32) -> bool {
 }
 
 fn get_timestamp() -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap();
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
     let secs = now.as_secs();
 
@@ -211,6 +209,32 @@ fn connect_timeout() -> Duration {
         .and_then(|v| v.trim().parse::<u64>().ok())
         .map(Duration::from_millis)
         .unwrap_or(Duration::from_millis(700))
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PortStatus {
+    Open,
+    Closed,
+    TimeoutFiltered,
+    InvalidAddress,
+}
+
+fn scan_port(target: &str, port: u16) -> PortStatus {
+    let socket_addr = match resolve_addr(target, port) {
+        Some(addr) => addr,
+        None => return PortStatus::InvalidAddress,
+    };
+
+    match TcpStream::connect_timeout(&socket_addr, connect_timeout()) {
+        Ok(_) => PortStatus::Open,
+        Err(e) => {
+            if e.kind() == io::ErrorKind::TimedOut {
+                PortStatus::TimeoutFiltered
+            } else {
+                PortStatus::Closed
+            }
+        }
+    }
 }
 
 fn resolve_target_note(target: &str) -> Option<String> {
@@ -677,16 +701,8 @@ fn profile_scan() {
         print!("\rScanning {} ({})... ", service_name, port);
         io::stdout().flush().unwrap();
 
-        let socket_addr = match resolve_addr(ip_input.as_str(), *port) {
-            Some(addr) => addr,
-            None => {
-                write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
-                continue;
-            }
-        };
-
-        match TcpStream::connect_timeout(&socket_addr, connect_timeout()) {
-            Ok(_) => {
+        match scan_port(ip_input.as_str(), *port) {
+            PortStatus::Open => {
                 print!("\r\x1b[2K");
                 println!(
                     "{}✓{} {}{}{} ({}{}{}) - {}{}OPEN{}",
@@ -712,15 +728,10 @@ fn profile_scan() {
                 print_progress_bar(percentage);
                 io::stdout().flush().unwrap();
             }
-            Err(e) => {
-                let status = if e.kind() == io::ErrorKind::TimedOut {
-                    "TIMEOUT/FILTERED"
-                } else {
-                    "CLOSED"
-                };
+            PortStatus::TimeoutFiltered => {
                 write_log_entry(
                     &mut log_file,
-                    &format!("Port {}: {} - {}", port, service_name, status),
+                    &format!("Port {}: {} - TIMEOUT/FILTERED", port, service_name),
                 );
                 print!(
                     "\rProgress: [{}/{}] {}% ",
@@ -730,6 +741,24 @@ fn profile_scan() {
                 );
                 print_progress_bar(percentage);
                 io::stdout().flush().unwrap();
+            }
+            PortStatus::Closed => {
+                write_log_entry(
+                    &mut log_file,
+                    &format!("Port {}: {} - CLOSED", port, service_name),
+                );
+                print!(
+                    "\rProgress: [{}/{}] {}% ",
+                    index + 1,
+                    total_ports,
+                    percentage
+                );
+                print_progress_bar(percentage);
+                io::stdout().flush().unwrap();
+            }
+            PortStatus::InvalidAddress => {
+                write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
+                continue;
             }
         }
     }
