@@ -125,6 +125,14 @@ fn get_timestamp() -> String {
     )
 }
 
+fn null_log_path() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "NUL"
+    } else {
+        "/dev/null"
+    }
+}
+
 fn create_log_file(scan_type: &str) -> (File, String) {
     let timestamp = get_timestamp();
     let filename = format!("scan_logs/scan_{}_{}.log", timestamp, scan_type);
@@ -132,7 +140,7 @@ fn create_log_file(scan_type: &str) -> (File, String) {
         Ok(f) => (f, filename),
         Err(_) => {
             println!("{}Warning: Could not create log file{}", YELLOW, RESET);
-            let f = File::create("/dev/null").unwrap();
+            let f = File::create(null_log_path()).unwrap();
             (f, String::from("(no log file created)"))
         }
     }
