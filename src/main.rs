@@ -398,16 +398,8 @@ fn scanner() {
             print_progress_bar(percentage);
             io::stdout().flush().unwrap();
 
-            let socket_addr = match resolve_addr(ip_input, port) {
-                Some(addr) => addr,
-                None => {
-                    write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
-                    continue;
-                }
-            };
-
-            match TcpStream::connect_timeout(&socket_addr, connect_timeout()) {
-                Ok(_) => {
+            match scan_port(ip_input, port) {
+                PortStatus::Open => {
                     print!("\r");
                     print!("{}", " ".repeat(60));
                     let service_name = get_service_name(port);
@@ -428,13 +420,15 @@ fn scanner() {
                     print_progress_bar(percentage);
                     io::stdout().flush().unwrap();
                 }
-                Err(e) => {
-                    let status = if e.kind() == io::ErrorKind::TimedOut {
-                        "TIMEOUT/FILTERED"
-                    } else {
-                        "CLOSED"
-                    };
-                    write_log_entry(&mut log_file, &format!("Port {}: {}", port, status));
+                PortStatus::TimeoutFiltered => {
+                    write_log_entry(&mut log_file, &format!("Port {}: TIMEOUT/FILTERED", port));
+                }
+                PortStatus::Closed => {
+                    write_log_entry(&mut log_file, &format!("Port {}: CLOSED", port));
+                }
+                PortStatus::InvalidAddress => {
+                    write_log_entry(&mut log_file, &format!("Port {}: Invalid address", port));
+                    continue;
                 }
             }
         }
