@@ -503,18 +503,10 @@ fn scanner() {
             thread::sleep(Duration::from_millis(300));
         }
 
-        let socket_addr = match resolve_addr(ip_input, port_input_formatted) {
-            Some(addr) => addr,
-            None => {
-                println!("\n{}Invalid address format{}", RED, RESET);
-                write_log_entry(&mut log_file, "Error: Invalid address format");
-                return;
-            }
-        };
-
         let mut open_ports = Vec::new();
-        match TcpStream::connect_timeout(&socket_addr, connect_timeout()) {
-            Ok(_) => {
+
+        match scan_port(ip_input, port_input_formatted) {
+            PortStatus::Open => {
                 let service_name = get_service_name(port_input_formatted);
                 println!(
                     " {}{}OPEN{} ({}{}{})",
@@ -526,20 +518,24 @@ fn scanner() {
                     &format!("Port {}: {} - OPEN", port_input_formatted, service_name),
                 );
             }
-            Err(e) => {
-                if e.kind() == io::ErrorKind::TimedOut {
-                    println!(" {}TIMEOUT/FILTERED{}", YELLOW, RESET);
-                    write_log_entry(
-                        &mut log_file,
-                        &format!("Port {}: TIMEOUT/FILTERED", port_input_formatted),
-                    );
-                } else {
-                    println!(" {}CLOSED{}", RED, RESET);
-                    write_log_entry(
-                        &mut log_file,
-                        &format!("Port {}: CLOSED", port_input_formatted),
-                    );
-                }
+            PortStatus::TimeoutFiltered => {
+                println!(" {}TIMEOUT/FILTERED{}", YELLOW, RESET);
+                write_log_entry(
+                    &mut log_file,
+                    &format!("Port {}: TIMEOUT/FILTERED", port_input_formatted),
+                );
+            }
+            PortStatus::Closed => {
+                println!(" {}CLOSED{}", RED, RESET);
+                write_log_entry(
+                    &mut log_file,
+                    &format!("Port {}: CLOSED", port_input_formatted),
+                );
+            }
+            PortStatus::InvalidAddress => {
+                println!("\n{}Invalid address format{}", RED, RESET);
+                write_log_entry(&mut log_file, "Error: Invalid address format");
+                return;
             }
         }
 
