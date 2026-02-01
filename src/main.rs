@@ -5,8 +5,7 @@ use services::get_service_name;
 use std::fs::{self, File};
 use std::io;
 use std::io::{stdin, stdout, Read, Write};
-use std::net::TcpStream;
-use std::net::ToSocketAddrs;
+use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::process;
 use std::thread;
@@ -197,20 +196,6 @@ fn write_log_summary(
     let _ = log_file.write_all(end_time.as_bytes());
 }
 
-fn resolve_addr(target: &str, port: u16) -> Option<std::net::SocketAddr> {
-    let mut last_v6 = None;
-    if let Ok(iter) = (target, port).to_socket_addrs() {
-        for addr in iter {
-            if addr.is_ipv4() {
-                return Some(addr);
-            } else {
-                last_v6 = Some(addr);
-            }
-        }
-    }
-    last_v6
-}
-
 fn connect_timeout() -> Duration {
     std::env::var("VONOGS_TIMEOUT_MS")
         .ok()
@@ -227,11 +212,13 @@ enum PortStatus {
     InvalidAddress,
 }
 
-fn scan_port(target: &str, port: u16) -> PortStatus {
-    let socket_addr = match resolve_addr(target, port) {
-        Some(addr) => addr,
+fn scan_port_ip(resolved_ip: Option<IpAddr>, port: u16) -> PortStatus {
+    let ip = match resolved_ip {
+        Some(ip) => ip,
         None => return PortStatus::InvalidAddress,
     };
+
+    let socket_addr = SocketAddr::new(ip, port);
 
     match TcpStream::connect_timeout(&socket_addr, connect_timeout()) {
         Ok(_) => PortStatus::Open,
@@ -245,26 +232,32 @@ fn scan_port(target: &str, port: u16) -> PortStatus {
     }
 }
 
-fn resolve_target_note(target: &str) -> Option<String> {
+fn resolve_target_note(target: &str) -> (Option<IpAddr>, Option<String>) {
     if is_valid_ip(target) {
-        return None;
+        return (target.trim().parse::<IpAddr>().ok(), None);
     }
 
     match (target, 80).to_socket_addrs() {
-        Ok(mut iter) => {
-            if let Some(addr) = iter.next() {
-                let note = format!("Resolved Target: {} -> {}", target, addr.ip());
+        Ok(iter) => {
+            let mut selected_v4 = None;
+            let mut last_v6 = None;
+
+            for addr in iter {
+                if addr.is_ipv4() {
+                    selected_v4 = Some(addr.ip());
+                    break;
+                } else {
+                    last_v6 = Some(addr.ip());
+                }
+            }
+
+            if let Some(ip) = selected_v4.or(last_v6) {
+                let note = format!("Resolved Target: {} -> {}", target, ip);
                 println!(
                     "{}Resolved {}{}{} to {}{}{}",
-                    YELLOW,
-                    CYAN,
-                    target,
-                    RESET,
-                    CYAN,
-                    addr.ip(),
-                    RESET
+                    YELLOW, CYAN, target, RESET, CYAN, ip, RESET
                 );
-                Some(note)
+                (Some(ip), Some(note))
             } else {
                 let note = format!("Resolution failed for '{}'", target);
                 println!(
@@ -272,7 +265,7 @@ fn resolve_target_note(target: &str) -> Option<String> {
                     YELLOW, target, RESET
                 );
                 thread::sleep(Duration::from_millis(500));
-                Some(note)
+                (None, Some(note))
             }
         }
         Err(_) => {
@@ -282,7 +275,7 @@ fn resolve_target_note(target: &str) -> Option<String> {
                 YELLOW, target, RESET
             );
             thread::sleep(Duration::from_millis(500));
-            Some(note)
+            (None, Some(note))
         }
     }
 }
@@ -306,7 +299,7 @@ fn scanner() {
 
     let ip_input = ip_input_raw.as_str();
 
-    let resolution_note = resolve_target_note(ip_input);
+    let (resolved_ip, resolution_note) = resolve_target_note(ip_input);
 
     println!("Scan multiple ports? (y/n)");
     let multi_choice = match read_input("") {
@@ -398,7 +391,7 @@ fn scanner() {
             print_progress_bar(percentage);
             io::stdout().flush().unwrap();
 
-            match scan_port(ip_input, port) {
+            match scan_port_ip(resolved_ip, port) {
                 PortStatus::Open => {
                     print!("\r");
                     print!("{}", " ".repeat(60));
@@ -505,7 +498,7 @@ fn scanner() {
 
         let mut open_ports = Vec::new();
 
-        match scan_port(ip_input, port_input_formatted) {
+        match scan_port_ip(resolved_ip, port_input_formatted) {
             PortStatus::Open => {
                 let service_name = get_service_name(port_input_formatted);
                 println!(
@@ -618,7 +611,7 @@ fn profile_scan() {
         }
     };
 
-    let resolution_note = resolve_target_note(ip_input.as_str());
+    let (resolved_ip, resolution_note) = resolve_target_note(ip_input.as_str());
 
     println!("\n{}Select scan profile{}:", YELLOW, RESET);
     println!(
@@ -699,7 +692,7 @@ fn profile_scan() {
         print!("\rScanning {} ({})... ", service_name, port);
         io::stdout().flush().unwrap();
 
-        match scan_port(ip_input.as_str(), *port) {
+        match scan_port_ip(resolved_ip, *port) {
             PortStatus::Open => {
                 print!("\r\x1b[2K");
                 println!(
