@@ -4,7 +4,7 @@ mod validation;
 use services::get_service_name;
 use std::fs::{self, File};
 use std::io;
-use std::io::{stdin, stdout, Read, Write};
+use std::io::{stdin, stdout, BufWriter, Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::process;
@@ -132,20 +132,20 @@ fn null_log_path() -> &'static str {
     }
 }
 
-fn create_log_file(scan_type: &str) -> (File, String) {
+fn create_log_file(scan_type: &str) -> (BufWriter<File>, String) {
     let timestamp = get_timestamp();
     let filename = format!("scan_logs/scan_{}_{}.log", timestamp, scan_type);
     match File::create(&filename) {
-        Ok(f) => (f, filename),
+        Ok(f) => (BufWriter::new(f), filename),
         Err(_) => {
             println!("{}Warning: Could not create log file{}", YELLOW, RESET);
             let f = File::create(null_log_path()).unwrap();
-            (f, String::from("(no log file created)"))
+            (BufWriter::new(f), String::from("(no log file created)"))
         }
     }
 }
 
-fn write_log_header(log_file: &mut File, scan_type: &str, target_ip: &str) {
+fn write_log_header<W: Write>(log_file: &mut W, scan_type: &str, target_ip: &str) {
     let timestamp = get_timestamp();
     let header = format!(
         "=================================\n\
@@ -160,12 +160,12 @@ fn write_log_header(log_file: &mut File, scan_type: &str, target_ip: &str) {
     let _ = log_file.write_all(header.as_bytes());
 }
 
-fn write_log_entry(log_file: &mut File, message: &str) {
+fn write_log_entry<W: Write>(log_file: &mut W, message: &str) {
     let _ = log_file.write_all(format!("{}\n", message).as_bytes());
 }
 
-fn write_log_summary(
-    log_file: &mut File,
+fn write_log_summary<W: Write>(
+    log_file: &mut W,
     open_ports: &Vec<u16>,
     total_scanned: u32,
     elapsed_secs: f32,
@@ -447,6 +447,7 @@ fn scanner() {
         }
 
         write_log_summary(&mut log_file, &open_ports, total_ports as u32, elapsed);
+        let _ = log_file.flush();
         println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     } else {
         println!("Please enter Port number");
@@ -535,6 +536,7 @@ fn scanner() {
         let elapsed = scan_started.elapsed().as_secs_f32();
 
         write_log_summary(&mut log_file, &open_ports, 1, elapsed);
+        let _ = log_file.flush();
         println!("{}Scan took {:.2} seconds{}", CYAN, elapsed, RESET);
         println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     }
@@ -789,6 +791,7 @@ fn profile_scan() {
     }
 
     write_log_summary(&mut log_file, &open_ports, total_ports as u32, elapsed);
+    let _ = log_file.flush();
     println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
 
     press_enter_to_continue();
