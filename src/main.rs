@@ -64,6 +64,19 @@ fn read_u16(prompt: &str) -> io::Result<u16> {
     }
 }
 
+fn read_yes_no(prompt: &str) -> io::Result<bool> {
+    loop {
+        let input = read_input(prompt)?;
+        match input.to_lowercase().as_str() {
+            "y" | "yes" => return Ok(true),
+            "n" | "no" => return Ok(false),
+            _ => {
+                println!("{}Please enter y or n.{}", YELLOW, RESET);
+            }
+        }
+    }
+}
+
 fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
@@ -302,8 +315,8 @@ fn scanner() {
     let (resolved_ip, resolution_note) = resolve_target_note(ip_input);
 
     println!("Scan multiple ports? (y/n)");
-    let multi_choice = match read_input("") {
-        Ok(input) => input,
+    let multi_choice = match read_yes_no("") {
+        Ok(choice) => choice,
         Err(_) => {
             println!("{}Failed to read choice{}", RED, RESET);
             menu_fallback();
@@ -311,7 +324,7 @@ fn scanner() {
         }
     };
 
-    if multi_choice.to_lowercase() == "y" {
+    if multi_choice {
         println!("Please enter START port number");
         let start_port = match read_u16("") {
             Ok(port) => port,
