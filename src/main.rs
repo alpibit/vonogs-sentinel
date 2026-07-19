@@ -4,7 +4,7 @@ mod validation;
 use services::get_service_name;
 use std::fs::{self, File};
 use std::io;
-use std::io::{stdin, stdout, BufWriter, Read, Write};
+use std::io::{stdin, stdout, BufWriter, Write};
 use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::process;
@@ -899,7 +899,8 @@ fn press_enter_with_message(message: &str) {
     let mut stdout = stdout();
     write!(stdout, "\n{}{}{}", YELLOW, message, RESET).unwrap();
     stdout.flush().unwrap();
-    stdin().read(&mut [0]).unwrap();
+    let mut buf = String::new();
+    stdin().read_line(&mut buf).unwrap();
 
     clear_screen();
     print_menu_items();
