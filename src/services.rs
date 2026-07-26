@@ -152,3 +152,29 @@ pub fn get_service_name(port: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_well_known_ports() {
+        assert_eq!(get_service_name(22), "SSH");
+        assert_eq!(get_service_name(80), "HTTP");
+        assert_eq!(get_service_name(443), "HTTPS");
+        assert_eq!(get_service_name(3306), "MySQL");
+    }
+
+    #[test]
+    fn several_ports_can_share_a_name() {
+        assert_eq!(get_service_name(2222), "SSH-ALT");
+        assert_eq!(get_service_name(22222), "SSH-ALT");
+    }
+
+    #[test]
+    fn unlisted_ports_fall_back_to_unknown() {
+        assert_eq!(get_service_name(54321), "Unknown");
+        assert_eq!(get_service_name(0), "Unknown");
+        assert_eq!(get_service_name(65535), "Unknown");
+    }
+}
