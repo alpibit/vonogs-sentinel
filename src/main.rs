@@ -31,6 +31,7 @@ fn main() {
                 "3" => end_program(),
                 _ => menu_fallback(),
             },
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => end_program(),
             Err(_) => menu_fallback(),
         }
     }
@@ -49,7 +50,10 @@ fn read_input(prompt: &str) -> io::Result<String> {
     }
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
+    let bytes_read = io::stdin().read_line(&mut input)?;
+    if bytes_read == 0 {
+        return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "end of input"));
+    }
     Ok(input.trim().to_string())
 }
 
@@ -897,10 +901,10 @@ fn end_program() {
 
 fn press_enter_with_message(message: &str) {
     let mut stdout = stdout();
-    write!(stdout, "\n{}{}{}", YELLOW, message, RESET).unwrap();
-    stdout.flush().unwrap();
+    let _ = write!(stdout, "\n{}{}{}", YELLOW, message, RESET);
+    let _ = stdout.flush();
     let mut buf = String::new();
-    stdin().read_line(&mut buf).unwrap();
+    let _ = stdin().read_line(&mut buf);
 
     clear_screen();
     print_menu_items();
