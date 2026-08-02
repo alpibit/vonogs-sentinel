@@ -179,7 +179,7 @@ fn write_log_entry<W: Write>(log_file: &mut W, message: &str) {
 
 fn write_log_summary<W: Write>(
     log_file: &mut W,
-    open_ports: &Vec<u16>,
+    open_ports: &[u16],
     total_scanned: u32,
     elapsed_secs: f32,
 ) {
