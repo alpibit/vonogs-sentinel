@@ -569,30 +569,35 @@ enum ScanProfile {
     Full,
 }
 
+const QUICK_PORTS: &[u16] = &[
+    21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 993, 995, 1723, 3306, 3389, 5900, 8080,
+];
+
+const WEB_PORTS: &[u16] = &[
+    80, 443, 3000, 3001, 4200, 4443, 5000, 5001, 8000, 8008, 8080, 8081, 8088, 8443, 8888, 9000,
+];
+
+const DATABASE_PORTS: &[u16] = &[
+    1433, 1521, 3306, 5432, 5984, 6379, 7000, 7001, 8086, 9042, 9200, 11211, 27017, 50000,
+];
+
+const FULL_PORTS: &[u16] = &[
+    21, 22, 23, 25, 53, 67, 68, 80, 110, 111, 123, 135, 139, 143, 161, 389, 443, 445, 465, 514, 587,
+    636, 993, 995, 1080, 1194, 1433, 1521, 1723, 1883, 3000, 3128, 3306, 3389, 5060, 5432, 5672,
+    5900, 5984, 5985, 6379, 7000, 8080, 8086, 8443, 8888, 9092, 9200, 10000, 11211, 15672, 27017,
+];
+
 impl ScanProfile {
-    fn get_ports(&self) -> Vec<u16> {
+    fn get_ports(&self) -> &'static [u16] {
         match self {
-            ScanProfile::Quick => vec![
-                21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 993, 995, 1723, 3306, 3389, 5900, 8080,
-            ],
-            ScanProfile::Web => vec![
-                80, 443, 3000, 3001, 4200, 4443, 5000, 5001, 8000, 8008, 8080, 8081, 8088, 8443,
-                8888, 9000,
-            ],
-            ScanProfile::Database => vec![
-                1433, 1521, 3306, 5432, 5984, 6379, 7000, 7001, 8086, 9042, 9200, 11211, 27017,
-                50000,
-            ],
-            ScanProfile::Full => vec![
-                21, 22, 23, 25, 53, 67, 68, 80, 110, 111, 123, 135, 139, 143, 161, 389, 443, 445,
-                465, 514, 587, 636, 993, 995, 1080, 1194, 1433, 1521, 1723, 1883, 3000, 3128, 3306,
-                3389, 5060, 5432, 5672, 5900, 5984, 5985, 6379, 7000, 8080, 8086, 8443, 8888, 9092,
-                9200, 10000, 11211, 15672, 27017,
-            ],
+            ScanProfile::Quick => QUICK_PORTS,
+            ScanProfile::Web => WEB_PORTS,
+            ScanProfile::Database => DATABASE_PORTS,
+            ScanProfile::Full => FULL_PORTS,
         }
     }
 
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         match self {
             ScanProfile::Quick => "Quick Scan",
             ScanProfile::Web => "Web Services",
@@ -601,7 +606,7 @@ impl ScanProfile {
         }
     }
 
-    fn get_log_name(&self) -> &str {
+    fn get_log_name(&self) -> &'static str {
         match self {
             ScanProfile::Quick => "profile_quick",
             ScanProfile::Web => "profile_web",
