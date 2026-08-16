@@ -81,6 +81,28 @@ fn read_yes_no(prompt: &str) -> io::Result<bool> {
     }
 }
 
+fn read_port_or_menu(label: &str) -> Option<u16> {
+    match read_u16("") {
+        Ok(port) if is_valid_port(port) => Some(port),
+        Ok(_) => {
+            println!("{}Invalid {}{}", RED, label, RESET);
+            thread::sleep(Duration::from_millis(2000));
+            menu_fallback();
+            None
+        }
+        Err(e) => {
+            if e.kind() == io::ErrorKind::InvalidInput {
+                println!("{}Invalid {}{}", RED, label, RESET);
+                thread::sleep(Duration::from_millis(2000));
+            } else {
+                println!("{}Failed to read {}{}", RED, label, RESET);
+            }
+            menu_fallback();
+            None
+        }
+    }
+}
+
 fn is_leap_year(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
@@ -330,46 +352,14 @@ fn scanner() {
 
     if multi_choice {
         println!("Please enter START port number");
-        let start_port = match read_u16("") {
-            Ok(port) => port,
-            Err(e) => {
-                if e.kind() == io::ErrorKind::InvalidInput {
-                    println!("{}Invalid start port{}", RED, RESET);
-                    thread::sleep(Duration::from_millis(2000));
-                } else {
-                    println!("{}Failed to read start port{}", RED, RESET);
-                }
-                menu_fallback();
-                return;
-            }
+        let Some(start_port) = read_port_or_menu("start port") else {
+            return;
         };
 
         println!("Please enter END port number");
-        let end_port = match read_u16("") {
-            Ok(port) => port,
-            Err(e) => {
-                if e.kind() == io::ErrorKind::InvalidInput {
-                    println!("{}Invalid end port{}", RED, RESET);
-                    thread::sleep(Duration::from_millis(2000));
-                } else {
-                    println!("{}Failed to read end port{}", RED, RESET);
-                }
-                menu_fallback();
-                return;
-            }
+        let Some(end_port) = read_port_or_menu("end port") else {
+            return;
         };
-
-        if !is_valid_port(start_port) {
-            println!("{}Invalid start port{}", RED, RESET);
-            menu_fallback();
-            return;
-        }
-
-        if !is_valid_port(end_port) {
-            println!("{}Invalid end port{}", RED, RESET);
-            menu_fallback();
-            return;
-        }
 
         if start_port > end_port {
             println!("{}Start port must be less than end port{}", RED, RESET);
@@ -468,29 +458,10 @@ fn scanner() {
         println!("\n{}Log saved to {}{}{}", CYAN, BOLD, log_path, RESET);
     } else {
         println!("Please enter Port number");
-        let port_input_formatted = match read_u16("") {
-            Ok(port) => {
-                println!("Selected Port {}{}{}", CYAN, port, RESET);
-                port
-            }
-            Err(e) => {
-                if e.kind() == io::ErrorKind::InvalidInput {
-                    println!("{}Invalid port number{}", RED, RESET);
-                    thread::sleep(Duration::from_millis(2000));
-                } else {
-                    println!("{}Failed to read port{}", RED, RESET);
-                }
-                menu_fallback();
-                return;
-            }
-        };
-
-        if !is_valid_port(port_input_formatted) {
-            println!("{}Invalid port number{}", RED, RESET);
-            thread::sleep(Duration::from_millis(2000));
-            menu_fallback();
+        let Some(port_input_formatted) = read_port_or_menu("port number") else {
             return;
-        }
+        };
+        println!("Selected Port {}{}{}", CYAN, port_input_formatted, RESET);
 
         let (mut log_file, log_path) = create_log_file("single_port");
         write_log_header(&mut log_file, "Single Port Scan", ip_input);
@@ -546,7 +517,6 @@ fn scanner() {
             PortStatus::InvalidAddress => {
                 println!("\n{}Invalid address format{}", RED, RESET);
                 write_log_entry(&mut log_file, "Error: Invalid address format");
-                return;
             }
         }
 
@@ -582,9 +552,10 @@ const DATABASE_PORTS: &[u16] = &[
 ];
 
 const FULL_PORTS: &[u16] = &[
-    21, 22, 23, 25, 53, 67, 68, 80, 110, 111, 123, 135, 139, 143, 161, 389, 443, 445, 465, 514, 587,
-    636, 993, 995, 1080, 1194, 1433, 1521, 1723, 1883, 3000, 3128, 3306, 3389, 5060, 5432, 5672,
-    5900, 5984, 5985, 6379, 7000, 8080, 8086, 8443, 8888, 9092, 9200, 10000, 11211, 15672, 27017,
+    21, 22, 23, 25, 53, 67, 68, 80, 110, 111, 123, 135, 139, 143, 161, 389, 443, 445, 465, 514,
+    587, 636, 993, 995, 1080, 1194, 1433, 1521, 1723, 1883, 3000, 3128, 3306, 3389, 5060, 5432,
+    5672, 5900, 5984, 5985, 6379, 7000, 8080, 8086, 8443, 8888, 9092, 9200, 10000, 11211, 15672,
+    27017,
 ];
 
 impl ScanProfile {
